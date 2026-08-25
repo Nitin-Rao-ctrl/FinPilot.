@@ -1,0 +1,635 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================
+   ROOT VARIABLES
+============================================================ */
+
+:root {
+  --obsidian: #050505;
+  --obsidian-2: #080a09;
+  --obsidian-3: #0c0f0d;
+  --surface: #111412;
+
+  --neon: #00ff88;
+  --emerald: #00d97e;
+
+  --text-primary: #f3f4f6;
+  --text-secondary: #d1d5db;
+  --text-muted: #6b7280;
+  --text-faint: #4b5563;
+
+  --border-light: rgba(255, 255, 255, 0.06);
+  --border-medium: rgba(255, 255, 255, 0.1);
+
+  --input-bg: rgba(255, 255, 255, 0.03);
+
+  color-scheme: dark;
+}
+
+/* ============================================================
+   GLOBAL
+============================================================ */
+
+* {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+
+  font-family:
+    'Inter',
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+
+  background: var(--obsidian);
+  color: var(--text-primary);
+
+  overflow-x: hidden;
+}
+
+/* ============================================================
+   ROOT
+============================================================ */
+
+#root {
+  min-height: 100vh;
+}
+
+/* ============================================================
+   SELECTION
+============================================================ */
+
+::selection {
+  background: rgba(0, 255, 136, 0.2);
+  color: #ffffff;
+}
+
+/* ============================================================
+   SCROLLBAR
+============================================================ */
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #080a09;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #1a1f1c;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 217, 126, 0.2);
+}
+
+/* ============================================================
+   FORM / INPUT GLOBAL
+============================================================ */
+
+input,
+textarea,
+select,
+button {
+  font-family: inherit;
+}
+
+/* Remove default number arrows */
+
+input[type='number']::-webkit-inner-spin-button,
+input[type='number']::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type='number'] {
+  -moz-appearance: textfield;
+}
+
+/* ============================================================
+   DATE INPUT
+============================================================ */
+
+input[type='date'] {
+  color-scheme: dark;
+}
+
+input[type='date']::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+  opacity: 0.65;
+  cursor: pointer;
+}
+
+input[type='date']::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+}
+
+/* ============================================================
+   SELECT / DROPDOWN
+============================================================ */
+
+select {
+  color-scheme: dark;
+}
+
+/*
+  Main select class
+*/
+.form-select {
+  @apply w-full px-3.5 py-2.5 rounded-lg text-sm text-gray-200 transition-colors focus:outline-none;
+  
+  background: #111412;
+
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.form-select:hover {
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.form-select:focus {
+  border-color: rgba(52, 211, 153, 0.3);
+  box-shadow: 0 0 0 1px rgba(52, 211, 153, 0.08);
+}
+
+/*
+  Native dropdown options
+*/
+.form-select option {
+  background: #111412;
+  color: #e5e7eb;
+}
+
+.form-select option:checked {
+  background: #123c2c;
+  color: #ffffff;
+}
+
+.form-select option:hover {
+  background: #163f30;
+  color: #ffffff;
+}
+
+/*
+  Fallback for native select elements
+*/
+select option {
+  background-color: #111412;
+  color: #e5e7eb;
+}
+
+/* ============================================================
+   TAILWIND COMPONENTS
+============================================================ */
+
+@layer components {
+
+  /* ==========================================================
+     GLASS
+  ========================================================== */
+
+  .glass {
+    @apply bg-white/[0.03] backdrop-blur-xl border border-white/[0.06] rounded-2xl;
+  }
+
+  /* ==========================================================
+     GLASS CARD
+  ========================================================== */
+
+  .glass-card {
+    @apply bg-white/[0.025] backdrop-blur-xl border border-white/[0.06] rounded-2xl transition-all duration-300;
+  }
+
+  .glass-card:hover {
+    @apply border-emerald-400/20 bg-white/[0.04];
+
+    box-shadow:
+      0 0 30px rgba(0, 217, 126, 0.05);
+  }
+
+  /* ==========================================================
+     NEON TEXT
+  ========================================================== */
+
+  .neon-text {
+    color: #00ff88;
+
+    text-shadow:
+      0 0 20px rgba(0, 255, 136, 0.3);
+  }
+
+  /* ==========================================================
+     NEON BORDER
+  ========================================================== */
+
+  .neon-border {
+    border: 1px solid rgba(0, 255, 136, 0.25);
+
+    box-shadow:
+      0 0 20px rgba(0, 255, 136, 0.1),
+      inset 0 0 20px rgba(0, 255, 136, 0.03);
+  }
+
+  /* ==========================================================
+     GRID BACKGROUND
+  ========================================================== */
+
+  .grid-bg {
+    background-image:
+      linear-gradient(
+        rgba(255, 255, 255, 0.015) 1px,
+        transparent 1px
+      ),
+      linear-gradient(
+        90deg,
+        rgba(255, 255, 255, 0.015) 1px,
+        transparent 1px
+      );
+
+    background-size: 40px 40px;
+  }
+
+  /* ==========================================================
+     EMERALD GLOW
+  ========================================================== */
+
+  .glow-emerald {
+    box-shadow:
+      0 0 40px rgba(0, 217, 126, 0.15);
+  }
+
+  /* ==========================================================
+     METRIC LABEL
+  ========================================================== */
+
+  .metric-label {
+    @apply text-[10px] uppercase tracking-[0.15em] text-gray-500 font-medium;
+  }
+
+  /* ==========================================================
+     FORM INPUT
+  ========================================================== */
+
+  .form-input {
+    @apply w-full px-3.5 py-2.5 rounded-lg text-sm text-gray-200 placeholder-gray-600 focus:outline-none transition-colors;
+
+    background: rgba(255, 255, 255, 0.03);
+
+    border: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  .form-input:hover {
+    border-color: rgba(255, 255, 255, 0.1);
+  }
+
+  .form-input:focus {
+    border-color: rgba(52, 211, 153, 0.3);
+
+    box-shadow:
+      0 0 0 1px rgba(52, 211, 153, 0.05);
+  }
+
+  /* ==========================================================
+     TEXTAREA
+  ========================================================== */
+
+  .form-textarea {
+    @apply w-full px-3.5 py-3 rounded-lg text-sm text-gray-200 placeholder-gray-600 focus:outline-none transition-colors resize-none;
+
+    background: rgba(255, 255, 255, 0.03);
+
+    border: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  .form-textarea:hover {
+    border-color: rgba(255, 255, 255, 0.1);
+  }
+
+  .form-textarea:focus {
+    border-color: rgba(52, 211, 153, 0.3);
+
+    box-shadow:
+      0 0 0 1px rgba(52, 211, 153, 0.05);
+  }
+
+  /* ==========================================================
+     SECTION LABEL
+  ========================================================== */
+
+  .section-label {
+    @apply text-xs uppercase tracking-[0.2em] text-emerald-400/70 font-semibold;
+  }
+
+  /* ==========================================================
+     BUTTON
+  ========================================================== */
+
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-400 text-[#050505] text-sm font-semibold transition-all;
+  }
+
+  .btn-primary:hover {
+    @apply bg-emerald-300;
+  }
+
+  .btn-primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  /* ==========================================================
+     SECONDARY BUTTON
+  ========================================================== */
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-gray-300 text-sm font-semibold transition-all;
+    
+    background: rgba(255, 255, 255, 0.04);
+
+    border: 1px solid rgba(255, 255, 255, 0.07);
+  }
+
+  .btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.07);
+  }
+
+  /* ==========================================================
+     DANGER BUTTON
+  ========================================================== */
+
+  .btn-danger {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-red-300 text-sm font-semibold transition-all;
+
+    background: rgba(248, 113, 113, 0.05);
+
+    border: 1px solid rgba(248, 113, 113, 0.1);
+  }
+
+  .btn-danger:hover {
+    background: rgba(248, 113, 113, 0.1);
+    border-color: rgba(248, 113, 113, 0.2);
+  }
+}
+
+/* ============================================================
+   UTILITIES
+============================================================ */
+
+@layer utilities {
+
+  /* ==========================================================
+     FADE UP
+  ========================================================== */
+
+  .animate-fade-up {
+    animation:
+      fadeUp 0.6s ease-out forwards;
+  }
+
+  /* ==========================================================
+     FADE IN
+  ========================================================== */
+
+  .animate-fade-in {
+    animation:
+      fadeIn 0.4s ease-out forwards;
+  }
+
+  /* ==========================================================
+     PULSE GLOW
+  ========================================================== */
+
+  .animate-pulse-glow {
+    animation:
+      pulseGlow 2s ease-in-out infinite;
+  }
+
+  /* ==========================================================
+     SCAN
+  ========================================================== */
+
+  .animate-scan {
+    animation:
+      scan 3s ease-in-out infinite;
+  }
+
+  /* ==========================================================
+     COUNT
+  ========================================================== */
+
+  .animate-count {
+    animation:
+      countUp 1s ease-out forwards;
+  }
+
+  /* ==========================================================
+     REVEAL
+  ========================================================== */
+
+  .reveal {
+    opacity: 0;
+
+    transform:
+      translateY(20px);
+
+    transition:
+      opacity 0.6s ease-out,
+      transform 0.6s ease-out;
+  }
+
+  .reveal.visible {
+    opacity: 1;
+
+    transform:
+      translateY(0);
+  }
+
+  /* ==========================================================
+     TEXT BALANCE
+  ========================================================== */
+
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+/* ============================================================
+   KEYFRAMES
+============================================================ */
+
+@keyframes fadeUp {
+
+  from {
+    opacity: 0;
+    transform:
+      translateY(16px);
+  }
+
+  to {
+    opacity: 1;
+    transform:
+      translateY(0);
+  }
+
+}
+
+@keyframes fadeIn {
+
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+
+}
+
+@keyframes pulseGlow {
+
+  0%,
+  100% {
+    opacity: 1;
+
+    box-shadow:
+      0 0 8px rgba(0, 255, 136, 0.4);
+  }
+
+  50% {
+    opacity: 0.6;
+
+    box-shadow:
+      0 0 16px rgba(0, 255, 136, 0.6);
+  }
+
+}
+
+@keyframes scan {
+
+  0%,
+  100% {
+    transform:
+      translateY(0);
+
+    opacity: 0.3;
+  }
+
+  50% {
+    transform:
+      translateY(100%);
+
+    opacity: 0.8;
+  }
+
+}
+
+@keyframes countUp {
+
+  from {
+    opacity: 0;
+
+    transform:
+      scale(0.95);
+  }
+
+  to {
+    opacity: 1;
+
+    transform:
+      scale(1);
+  }
+
+}
+
+@keyframes gradientShift {
+
+  0% {
+    background-position:
+      0% 50%;
+  }
+
+  50% {
+    background-position:
+      100% 50%;
+  }
+
+  100% {
+    background-position:
+      0% 50%;
+  }
+
+}
+
+/* ============================================================
+   GRADIENT UTILITY
+============================================================ */
+
+.animate-gradient {
+  background-size:
+    200% 200%;
+
+  animation:
+    gradientShift 4s ease infinite;
+}
+
+/* ============================================================
+   FOCUS ACCESSIBILITY
+============================================================ */
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline:
+    2px solid rgba(52, 211, 153, 0.45);
+
+  outline-offset: 2px;
+}
+
+/* ============================================================
+   DISABLED STATE
+============================================================ */
+
+button:disabled,
+input:disabled,
+select:disabled,
+textarea:disabled {
+  cursor: not-allowed;
+}
+
+/* ============================================================
+   MOBILE
+============================================================ */
+
+@media (max-width: 640px) {
+
+  .glass,
+  .glass-card {
+    border-radius: 1rem;
+  }
+
+  .metric-label {
+    letter-spacing: 0.12em;
+  }
+
+}
