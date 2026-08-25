@@ -1,21 +1,42 @@
-import { useState } from 'react';
+import {
+  useEffect,
+  useState,
+} from 'react';
+
 import {
   HelpCircle,
   ArrowRight,
   AlertTriangle,
   CheckCircle2,
   Info,
+  RefreshCw,
 } from 'lucide-react';
+
 import { Reveal } from '@/lib/animations';
 
 type Category =
   | 'Food'
   | 'Shopping'
-  | 'Transport'
+  | 'Travel'
   | 'Entertainment'
   | 'Bills'
   | 'Health'
+  | 'Education'
+  | 'Rent'
+  | 'Subscription'
+  | 'Personal'
   | 'Other';
+
+type Transaction = {
+  _id?: string;
+  id?: string;
+  type: 'income' | 'expense';
+  amount: number | string;
+  category?: string;
+  description?: string;
+  merchant?: string;
+  date: string;
+};
 
 type Analysis = {
   currentBalance: number;
@@ -25,126 +46,456 @@ type Analysis = {
   budgetUtilization: number;
   categoryPercentage: number;
   budgetRemaining: number;
+  currentMonthSpent: number;
   goalImpact: 'LOW' | 'MODERATE' | 'HIGH';
-  status: 'GOOD' | 'CAUTION' | 'NOT RECOMMENDED';
+  status:
+    | 'GOOD'
+    | 'CAUTION'
+    | 'NOT RECOMMENDED';
   message: string;
   warnings: string[];
 };
 
+const API_URL = 'http://localhost:5000';
+
+const CATEGORIES: Category[] = [
+  'Food',
+  'Shopping',
+  'Travel',
+  'Entertainment',
+  'Bills',
+  'Health',
+  'Education',
+  'Rent',
+  'Subscription',
+  'Personal',
+  'Other',
+];
+
+function isCurrentMonth(dateValue: string) {
+  const date = new Date(dateValue);
+  const now = new Date();
+
+  return (
+    date.getFullYear() ===
+      now.getFullYear() &&
+    date.getMonth() === now.getMonth()
+  );
+}
+
+function readSavedBudget() {
+  const stored =
+    localStorage.getItem(
+      'smartspend_budget'
+    );
+
+  if (!stored) {
+    return 0;
+  }
+
+  try {
+    const parsed =
+      JSON.parse(stored);
+
+    if (
+      typeof parsed === 'number'
+    ) {
+      return parsed;
+    }
+
+    if (
+      parsed &&
+      typeof parsed.totalBudget ===
+        'number'
+    ) {
+      return parsed.totalBudget;
+    }
+
+    if (
+      parsed &&
+      typeof parsed.amount ===
+        'number'
+    ) {
+      return parsed.amount;
+    }
+
+    return 0;
+  } catch {
+    return 0;
+  }
+}
+
+function getCurrentBalance(
+  transactions: Transaction[]
+) {
+  return transactions.reduce(
+    (balance, transaction) => {
+      const amount = Number(
+        transaction.amount || 0
+      );
+
+      if (!Number.isFinite(amount)) {
+        return balance;
+      }
+
+      if (
+        transaction.type ===
+        'income'
+      ) {
+        return balance + amount;
+      }
+
+      return balance - amount;
+    },
+    0
+  );
+}
+
+function getCurrentMonthSpent(
+  transactions: Transaction[]
+) {
+  return transactions.reduce(
+    (total, transaction) => {
+      if (
+        transaction.type !==
+          'expense' ||
+        !isCurrentMonth(
+          transaction.date
+        )
+      ) {
+        return total;
+      }
+
+      const amount = Number(
+        transaction.amount || 0
+      );
+
+      return (
+        total +
+        (Number.isFinite(amount)
+          ? amount
+          : 0)
+      );
+    },
+    0
+  );
+}
+
+function getCategorySpent(
+  transactions: Transaction[],
+  category: Category
+) {
+  return transactions.reduce(
+    (total, transaction) => {
+      if (
+        transaction.type !==
+          'expense' ||
+        !isCurrentMonth(
+          transaction.date
+        )
+      ) {
+        return total;
+      }
+
+      if (
+        (transaction.category ||
+          'Other') !==
+        category
+      ) {
+        return total;
+      }
+
+      const amount = Number(
+        transaction.amount || 0
+      );
+
+      return (
+        total +
+        (Number.isFinite(amount)
+          ? amount
+          : 0)
+      );
+    },
+    0
+  );
+}
+
 export function AskPage() {
-  const [amount, setAmount] = useState('');
-  const [category, setCategory] = useState<Category>('Food');
-  const [description, setDescription] = useState('');
-  const [analysis, setAnalysis] = useState<Analysis | null>(null);
+  const [amount, setAmount] =
+    useState('');
+
+  const [category, setCategory] =
+    useState<Category>('Food');
+
+  const [description, setDescription] =
+    useState('');
+
+  const [analysis, setAnalysis] =
+    useState<Analysis | null>(
+      null
+    );
+
+  const [transactions, setTransactions] =
+    useState<Transaction[]>([]);
+
+  const [monthlyBudget, setMonthlyBudget] =
+    useState(0);
+
+  const [loadingData, setLoadingData] =
+    useState(true);
+
+  const [dataError, setDataError] =
+    useState('');
+
+  async function loadFinancialData() {
+    try {
+      setLoadingData(true);
+      setDataError('');
+
+      const response =
+        await fetch(
+          `${API_URL}/api/transactions`
+        );
+
+      if (!response.ok) {
+        throw new Error(
+          'Failed to load transactions'
+        );
+      }
+
+      const data =
+        await response.json();
+
+      setTransactions(
+        Array.isArray(data)
+          ? data
+          : []
+      );
+
+      setMonthlyBudget(
+        readSavedBudget()
+      );
+    } catch (error) {
+      console.error(
+        'Failed to load financial data:',
+        error
+      );
+
+      setDataError(
+        'Could not load financial data. Make sure the backend is running on port 5000.'
+      );
+
+      setTransactions([]);
+      setMonthlyBudget(
+        readSavedBudget()
+      );
+    } finally {
+      setLoadingData(false);
+    }
+  }
+
+  useEffect(() => {
+    loadFinancialData();
+
+    const handleBudgetChange =
+      () => {
+        setMonthlyBudget(
+          readSavedBudget()
+        );
+      };
+
+    window.addEventListener(
+      'storage',
+      handleBudgetChange
+    );
+
+    return () => {
+      window.removeEventListener(
+        'storage',
+        handleBudgetChange
+      );
+    };
+  }, []);
 
   function handleAnalyze() {
-    const purchaseAmount = Number(amount);
+    const purchaseAmount =
+      Number(amount);
 
-    if (!purchaseAmount || purchaseAmount <= 0) {
+    if (
+      !purchaseAmount ||
+      purchaseAmount <= 0
+    ) {
       setAnalysis(null);
       return;
     }
 
-    /*
-      IMPORTANT:
-      No fake/mock expense is loaded here.
+    const currentBalance =
+      getCurrentBalance(
+        transactions
+      );
 
-      If your app later has real balance/budget data,
-      these values can be connected to that data.
-    */
+    const currentMonthSpent =
+      getCurrentMonthSpent(
+        transactions
+      );
 
-    const currentBalance = getCurrentBalance();
-    const monthlyBudget = getMonthlyBudget();
-    const categorySpent = getCategorySpent(category);
+    const categorySpent =
+      getCategorySpent(
+        transactions,
+        category
+      );
 
-    const afterPurchase = Math.max(
-      0,
-      currentBalance - purchaseAmount
-    );
+    const budget =
+      monthlyBudget;
 
-    const dailyLimit =
-      monthlyBudget > 0
-        ? Math.max(0, monthlyBudget / 30)
+    const afterPurchase =
+      currentBalance -
+      purchaseAmount;
+
+    const budgetRemaining =
+      budget > 0
+        ? budget -
+          currentMonthSpent -
+          purchaseAmount
         : 0;
 
-    const budgetRemaining = Math.max(
-      0,
-      monthlyBudget - purchaseAmount
-    );
+    /*
+      We assume roughly 30 days for
+      a simple daily spending guideline.
+    */
+    const dailyLimit =
+      budget > 0
+        ? budget / 30
+        : 0;
 
     const budgetUtilization =
-      monthlyBudget > 0
+      budget > 0
         ? Math.min(
             100,
-            (purchaseAmount / monthlyBudget) * 100
+            ((currentMonthSpent +
+              purchaseAmount) /
+              budget) *
+              100
           )
         : 0;
 
-    const previousCategorySpent = categorySpent;
-
     const categoryPercentage =
-      monthlyBudget > 0
+      budget > 0
         ? Math.min(
             100,
-            ((previousCategorySpent + purchaseAmount) /
-              monthlyBudget) *
+            ((categorySpent +
+              purchaseAmount) /
+              budget) *
               100
           )
         : 0;
 
     const warnings: string[] = [];
 
+    /* ======================================================
+       WARNINGS
+    ====================================================== */
+
     if (
-      dailyLimit > 0 &&
-      purchaseAmount > dailyLimit
+      budget > 0 &&
+      purchaseAmount >
+        dailyLimit
     ) {
       warnings.push(
-        `Expense exceeds your recommended daily limit by ₹${Math.round(
-          purchaseAmount - dailyLimit
-        ).toLocaleString('en-IN')}`
+        `This purchase is ₹${Math.round(
+          purchaseAmount -
+            dailyLimit
+        ).toLocaleString(
+          'en-IN'
+        )} above your approximate daily budget limit.`
       );
     }
 
     if (
-      categoryPercentage > 40
+      budget > 0 &&
+      budgetRemaining < 0
     ) {
       warnings.push(
-        `${category} spending would be relatively high compared with your budget`
+        `This purchase would push your monthly spending ₹${Math.abs(
+          budgetRemaining
+        ).toLocaleString(
+          'en-IN'
+        )} over budget.`
+      );
+    } else if (
+      budget > 0 &&
+      budgetRemaining <
+        budget * 0.1
+    ) {
+      warnings.push(
+        `Only ₹${budgetRemaining.toLocaleString(
+          'en-IN'
+        )} of your monthly budget would remain.`
       );
     }
 
     if (
-      monthlyBudget > 0 &&
-      purchaseAmount > monthlyBudget * 0.5
+      budget > 0 &&
+      categoryPercentage >
+        40
     ) {
       warnings.push(
-        'This purchase would use a significant portion of your available budget'
+        `${category} spending would become ${Math.round(
+          categoryPercentage
+        )}% of your monthly budget.`
       );
     }
 
     if (
-      currentBalance > 0 &&
-      purchaseAmount > currentBalance
+      currentBalance <=
+      0
     ) {
       warnings.push(
-        'You do not currently have enough available balance for this purchase'
+        'Your current balance is not positive.'
+      );
+    } else if (
+      purchaseAmount >
+      currentBalance
+    ) {
+      warnings.push(
+        'You do not currently have enough balance for this purchase.'
       );
     }
 
-    let status: Analysis['status'] = 'GOOD';
-    let goalImpact: Analysis['goalImpact'] = 'LOW';
+    /* ======================================================
+       STATUS
+    ====================================================== */
+
+    let status:
+      | Analysis['status'] =
+      'GOOD';
+
+    let goalImpact:
+      | Analysis['goalImpact'] =
+      'LOW';
 
     if (
-      currentBalance === 0 &&
-      monthlyBudget === 0
+      currentBalance <=
+        0 &&
+      budget <= 0
     ) {
       status = 'CAUTION';
       goalImpact = 'MODERATE';
     } else if (
-      currentBalance > 0 &&
-      purchaseAmount > currentBalance
+      purchaseAmount >
+      currentBalance
     ) {
-      status = 'NOT RECOMMENDED';
+      status =
+        'NOT RECOMMENDED';
+
+      goalImpact = 'HIGH';
+    } else if (
+      budget > 0 &&
+      budgetRemaining < 0
+    ) {
+      status =
+        'NOT RECOMMENDED';
+
       goalImpact = 'HIGH';
     } else if (
       warnings.length >= 2
@@ -158,50 +509,67 @@ export function AskPage() {
       goalImpact = 'LOW';
     }
 
+    /* ======================================================
+       MESSAGE
+    ====================================================== */
+
     let message = '';
 
-    if (currentBalance === 0 && monthlyBudget === 0) {
+    if (
+      currentBalance <=
+        0 &&
+      budget <= 0
+    ) {
       message =
         `You are planning to spend ₹${purchaseAmount.toLocaleString(
           'en-IN'
-        )} on ${category.toLowerCase()}. ` +
-        `There is not enough financial data available yet to give a strong recommendation. ` +
-        `Add your income, budget, and transactions to get a more accurate analysis.`;
+        )} on ${category.toLowerCase()}, but FinPilot does not have enough financial data to give a reliable recommendation yet. Set a monthly budget and add income/expense transactions.`;
     } else if (
-      currentBalance > 0 &&
-      purchaseAmount > currentBalance
+      purchaseAmount >
+      currentBalance
     ) {
       message =
-        `This purchase is larger than your current available balance. ` +
-        `Spending ₹${purchaseAmount.toLocaleString(
-          'en-IN'
-        )} would not be recommended right now.`;
-    } else if (warnings.length > 0) {
-      message =
-        `You currently have ₹${currentBalance.toLocaleString(
-          'en-IN'
-        )} available. ` +
         `This ₹${purchaseAmount.toLocaleString(
           'en-IN'
-        )} purchase needs some caution based on your current spending pattern.`;
+        )} purchase is larger than your current available balance of ₹${currentBalance.toLocaleString(
+          'en-IN'
+        )}. It is not recommended right now.`;
+    } else if (
+      budget > 0 &&
+      budgetRemaining < 0
+    ) {
+      message =
+        `This purchase would take your monthly spending over budget. You would exceed your ₹${budget.toLocaleString(
+          'en-IN'
+        )} budget by ₹${Math.abs(
+          budgetRemaining
+        ).toLocaleString(
+          'en-IN'
+        )}.`;
+    } else if (
+      warnings.length > 0
+    ) {
+      message =
+        `You can afford this ₹${purchaseAmount.toLocaleString(
+          'en-IN'
+        )} purchase, but it deserves some caution based on your current spending and budget.`;
     } else {
       message =
-        `You currently have ₹${currentBalance.toLocaleString(
-          'en-IN'
-        )} available. ` +
         `This ₹${purchaseAmount.toLocaleString(
           'en-IN'
-        )} purchase appears manageable based on the available information.`;
+        )} purchase appears manageable based on your current balance and monthly budget.`;
     }
 
     setAnalysis({
       currentBalance,
       afterPurchase,
       dailyLimit,
-      proposed: purchaseAmount,
+      proposed:
+        purchaseAmount,
       budgetUtilization,
       categoryPercentage,
       budgetRemaining,
+      currentMonthSpent,
       goalImpact,
       status,
       message,
@@ -219,48 +587,172 @@ export function AskPage() {
   return (
     <div className="space-y-6">
 
-      {/* HEADER */}
-      <Reveal>
-        <div>
-          <h1 className="text-2xl font-bold text-white">
-            Should I Spend?
-          </h1>
+      {/* ====================================================
+          HEADER
+      ==================================================== */}
 
-          <p className="text-sm text-gray-500 mt-0.5">
-            Evaluate a planned expense before you spend
-          </p>
+      <Reveal>
+
+        <div className="flex items-start justify-between gap-4">
+
+          <div>
+
+            <h1 className="text-2xl font-bold text-white">
+              Should I Spend?
+            </h1>
+
+            <p className="text-sm text-gray-500 mt-0.5">
+              Evaluate a planned expense using your actual financial data
+            </p>
+
+          </div>
+
+          <button
+            type="button"
+            onClick={
+              loadFinancialData
+            }
+            disabled={
+              loadingData
+            }
+            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg border border-white/[0.07] text-gray-400 text-xs hover:text-white hover:bg-white/[0.03] transition-all disabled:opacity-50"
+          >
+
+            <RefreshCw
+              className={`w-3.5 h-3.5 ${
+                loadingData
+                  ? 'animate-spin'
+                  : ''
+              }`}
+            />
+
+            Refresh
+
+          </button>
+
         </div>
+
       </Reveal>
 
-      {/* MAIN ANALYSIS CARD */}
+      {/* ====================================================
+          DATA ERROR
+      ==================================================== */}
+
+      {dataError && (
+
+        <Reveal>
+
+          <div className="rounded-xl border border-red-400/10 bg-red-400/[0.05] p-4">
+
+            <p className="text-sm text-red-300">
+              {dataError}
+            </p>
+
+          </div>
+
+        </Reveal>
+      )}
+
+      {/* ====================================================
+          FINANCIAL SUMMARY
+      ==================================================== */}
+
+      <Reveal delay={30}>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+
+          <SummaryCard
+            label="Current Balance"
+            value={`₹${getCurrentBalance(
+              transactions
+            ).toLocaleString(
+              'en-IN'
+            )}`}
+          />
+
+          <SummaryCard
+            label="This Month Spent"
+            value={`₹${getCurrentMonthSpent(
+              transactions
+            ).toLocaleString(
+              'en-IN'
+            )}`}
+          />
+
+          <SummaryCard
+            label="Monthly Budget"
+            value={
+              monthlyBudget >
+              0
+                ? `₹${monthlyBudget.toLocaleString(
+                    'en-IN'
+                  )}`
+                : 'Not set'
+            }
+          />
+
+          <SummaryCard
+            label="Budget Left"
+            value={
+              monthlyBudget >
+              0
+                ? `₹${Math.max(
+                    0,
+                    monthlyBudget -
+                      getCurrentMonthSpent(
+                        transactions
+                      )
+                  ).toLocaleString(
+                    'en-IN'
+                  )}`
+                : 'Not set'
+            }
+          />
+
+        </div>
+
+      </Reveal>
+
+      {/* ====================================================
+          MAIN ANALYSIS CARD
+      ==================================================== */}
+
       <Reveal delay={50}>
+
         <div className="glass-card overflow-hidden neon-border">
 
           <div className="grid lg:grid-cols-2">
 
-            {/* LEFT SIDE */}
+            {/* =================================================
+                LEFT
+            ================================================= */}
+
             <div className="p-6 border-b lg:border-b-0 lg:border-r border-white/[0.05]">
 
-              {/* TITLE */}
               <div className="flex items-center gap-3 mb-6">
 
                 <div className="w-10 h-10 rounded-xl bg-emerald-400/10 flex items-center justify-center">
+
                   <HelpCircle className="w-5 h-5 text-emerald-400" />
+
                 </div>
 
                 <div>
+
                   <h2 className="text-sm font-semibold text-white">
                     Planned Expense
                   </h2>
 
                   <p className="text-xs text-gray-500 mt-0.5">
-                    Tell us what you're planning to buy
+                    Tell FinPilot what you are planning to buy
                   </p>
+
                 </div>
 
               </div>
 
-              {/* AMOUNT */}
+              {/* Amount */}
+
               <div className="mb-5">
 
                 <label className="block text-xs uppercase tracking-wider text-gray-500 font-medium mb-2">
@@ -279,8 +771,12 @@ export function AskPage() {
                     step="0.01"
                     value={amount}
                     onChange={(e) => {
-                      setAmount(e.target.value);
-                      setAnalysis(null);
+                      setAmount(
+                        e.target.value
+                      );
+                      setAnalysis(
+                        null
+                      );
                     }}
                     placeholder="Enter amount"
                     className="form-input pl-10 w-full"
@@ -290,7 +786,8 @@ export function AskPage() {
 
               </div>
 
-              {/* CATEGORY */}
+              {/* Category */}
+
               <div className="mb-5">
 
                 <label className="block text-xs uppercase tracking-wider text-gray-500 font-medium mb-2">
@@ -301,40 +798,52 @@ export function AskPage() {
                   value={category}
                   onChange={(e) => {
                     setCategory(
-                      e.target.value as Category
+                      e.target
+                        .value as Category
                     );
-                    setAnalysis(null);
+
+                    setAnalysis(
+                      null
+                    );
                   }}
-                  className="form-input w-full"
+                  className="form-select w-full"
                 >
-                  <option value="Food">Food</option>
-                  <option value="Shopping">Shopping</option>
-                  <option value="Transport">
-                    Transport
-                  </option>
-                  <option value="Entertainment">
-                    Entertainment
-                  </option>
-                  <option value="Bills">Bills</option>
-                  <option value="Health">Health</option>
-                  <option value="Other">Other</option>
+
+                  {CATEGORIES.map(
+                    (item) => (
+                      <option
+                        key={item}
+                        value={item}
+                      >
+                        {item}
+                      </option>
+                    )
+                  )}
+
                 </select>
 
               </div>
 
-              {/* DESCRIPTION */}
+              {/* Description */}
+
               <div className="mb-5">
 
                 <label className="block text-xs uppercase tracking-wider text-gray-500 font-medium mb-2">
-                  Description (Optional)
+                  Description
                 </label>
 
                 <input
                   type="text"
                   value={description}
                   onChange={(e) => {
-                    setDescription(e.target.value);
-                    setAnalysis(null);
+                    setDescription(
+                      e.target
+                        .value
+                    );
+
+                    setAnalysis(
+                      null
+                    );
                   }}
                   placeholder="What are you planning to buy?"
                   className="form-input w-full"
@@ -342,46 +851,70 @@ export function AskPage() {
 
               </div>
 
-              {/* BUTTONS */}
+              {/* Buttons */}
+
               <div className="flex gap-3">
 
                 <button
                   type="button"
-                  onClick={handleAnalyze}
+                  onClick={
+                    handleAnalyze
+                  }
                   disabled={
+                    loadingData ||
                     !amount ||
                     Number(amount) <= 0
                   }
                   className="flex-1 inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-emerald-400 text-[#050505] text-sm font-semibold hover:bg-emerald-300 disabled:opacity-40 disabled:cursor-not-allowed transition-all glow-emerald"
                 >
+
                   ANALYZE EXPENSE
+
                   <ArrowRight className="w-4 h-4" />
+
                 </button>
 
                 {analysis && (
+
                   <button
                     type="button"
-                    onClick={handleReset}
+                    onClick={
+                      handleReset
+                    }
                     className="px-5 py-3 rounded-xl border border-white/[0.08] text-gray-400 text-sm hover:text-white hover:bg-white/[0.03] transition-all"
                   >
                     Reset
                   </button>
+
                 )}
 
               </div>
 
             </div>
 
-            {/* RIGHT SIDE */}
+            {/* =================================================
+                RIGHT
+            ================================================= */}
+
             <div className="p-6">
 
               {!analysis ? (
-                <EmptyAnalysis />
+                <EmptyAnalysis
+                  loading={
+                    loadingData
+                  }
+                />
               ) : (
                 <AnalysisResult
-                  analysis={analysis}
-                  description={description}
-                  category={category}
+                  analysis={
+                    analysis
+                  }
+                  description={
+                    description
+                  }
+                  category={
+                    category
+                  }
                 />
               )}
 
@@ -390,10 +923,15 @@ export function AskPage() {
           </div>
 
         </div>
+
       </Reveal>
 
-      {/* FINANCIAL IMPACT */}
+      {/* ====================================================
+          FINANCIAL IMPACT
+      ==================================================== */}
+
       {analysis && (
+
         <Reveal delay={100}>
 
           <div className="glass-card p-6">
@@ -407,50 +945,64 @@ export function AskPage() {
               <MetricBox
                 label="Budget Utilization"
                 value={
-                  analysis.budgetUtilization > 0
+                  monthlyBudget >
+                  0
                     ? `${analysis.budgetUtilization.toFixed(
                         1
                       )}%`
                     : 'N/A'
                 }
                 warning={
-                  analysis.budgetUtilization > 80
+                  analysis.budgetUtilization >
+                  80
                 }
               />
 
               <MetricBox
                 label="Category %"
                 value={
-                  analysis.categoryPercentage > 0
+                  monthlyBudget >
+                  0
                     ? `${Math.round(
                         analysis.categoryPercentage
                       )}%`
                     : 'N/A'
                 }
                 warning={
-                  analysis.categoryPercentage > 40
+                  analysis.categoryPercentage >
+                  40
                 }
               />
 
               <MetricBox
                 label="Budget Remaining"
                 value={
-                  analysis.budgetRemaining > 0
-                    ? `₹${analysis.budgetRemaining.toLocaleString(
+                  monthlyBudget >
+                  0
+                    ? `₹${Math.max(
+                        0,
+                        analysis.budgetRemaining
+                      ).toLocaleString(
                         'en-IN'
                       )}`
                     : 'N/A'
                 }
                 warning={
-                  analysis.budgetRemaining === 0
+                  monthlyBudget >
+                    0 &&
+                  analysis.budgetRemaining <
+                    0
                 }
               />
 
               <MetricBox
                 label="Goal Impact"
-                value={analysis.goalImpact}
+                value={
+                  analysis.goalImpact
+                }
                 warning={
-                  analysis.goalImpact !== 'LOW'
+                  analysis.goalImpact !==
+                  'LOW'
                 }
               />
 
@@ -466,27 +1018,65 @@ export function AskPage() {
 }
 
 /* ============================================================
+   SUMMARY CARD
+============================================================ */
+
+function SummaryCard({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="glass-card p-4">
+
+      <p className="metric-label">
+        {label}
+      </p>
+
+      <p className="text-lg font-bold text-white mt-2">
+        {value}
+      </p>
+
+    </div>
+  );
+}
+
+/* ============================================================
    EMPTY ANALYSIS
 ============================================================ */
 
-function EmptyAnalysis() {
+function EmptyAnalysis({
+  loading,
+}: {
+  loading: boolean;
+}) {
   return (
     <div className="h-full min-h-[300px] flex flex-col items-center justify-center text-center">
 
       <div className="w-12 h-12 rounded-xl bg-white/[0.03] flex items-center justify-center mb-4">
-        <Info className="w-5 h-5 text-gray-500" />
+
+        {loading ? (
+          <RefreshCw className="w-5 h-5 text-emerald-400 animate-spin" />
+        ) : (
+          <Info className="w-5 h-5 text-gray-500" />
+        )}
+
       </div>
 
       <h3 className="text-sm font-semibold text-gray-300">
-        AI Analysis
+        {loading
+          ? 'Loading financial data...'
+          : 'AI Analysis'}
       </h3>
 
       <p className="text-xs text-gray-500 max-w-sm mt-2 leading-relaxed">
-        Enter an expense amount and click
-        <span className="text-gray-300">
-          {' '}Analyze Expense{' '}
-        </span>
-        to see its potential financial impact.
+
+        {loading
+          ? 'Getting your transactions and budget.'
+          : 'Enter an expense amount and click Analyze Expense to see its potential financial impact.'}
+
       </p>
 
     </div>
@@ -506,13 +1096,17 @@ function AnalysisResult({
   description: string;
   category: Category;
 }) {
-  const isGood = analysis.status === 'GOOD';
-  const isCaution = analysis.status === 'CAUTION';
+  const isGood =
+    analysis.status ===
+    'GOOD';
+
+  const isCaution =
+    analysis.status ===
+    'CAUTION';
 
   return (
     <div>
 
-      {/* ANALYSIS HEADER */}
       <div className="flex items-center justify-between mb-5">
 
         <div className="flex items-center gap-2">
@@ -528,7 +1122,7 @@ function AnalysisResult({
           />
 
           <span className="text-xs uppercase tracking-[0.15em] font-semibold text-emerald-400">
-            AI Analysis
+            FinPilot Analysis
           </span>
 
         </div>
@@ -547,35 +1141,39 @@ function AnalysisResult({
 
       </div>
 
-      {/* STATS */}
       <div className="grid grid-cols-2 gap-3 mb-4">
 
         <AnalysisStat
           label="Current Balance"
-          value={
-            analysis.currentBalance > 0
-              ? `₹${analysis.currentBalance.toLocaleString(
-                  'en-IN'
-                )}`
-              : '₹0'
-          }
+          value={`₹${analysis.currentBalance.toLocaleString(
+            'en-IN'
+          )}`}
         />
 
         <AnalysisStat
           label="After Purchase"
-          value={`₹${analysis.afterPurchase.toLocaleString(
+          value={`₹${Math.max(
+            0,
+            analysis.afterPurchase
+          ).toLocaleString(
             'en-IN'
           )}`}
-          highlight={!isGood}
+          highlight={
+            analysis.afterPurchase <
+            0
+          }
         />
 
         <AnalysisStat
           label="Daily Limit"
           value={
-            analysis.dailyLimit > 0
+            analysis.dailyLimit >
+            0
               ? `₹${Math.round(
                   analysis.dailyLimit
-                ).toLocaleString('en-IN')}`
+                ).toLocaleString(
+                  'en-IN'
+                )}`
               : 'N/A'
           }
         />
@@ -585,12 +1183,13 @@ function AnalysisResult({
           value={`₹${analysis.proposed.toLocaleString(
             'en-IN'
           )}`}
-          highlight={!isGood}
+          highlight={
+            !isGood
+          }
         />
 
       </div>
 
-      {/* MESSAGE */}
       <div
         className={`rounded-xl p-4 border ${
           isGood
@@ -623,7 +1222,8 @@ function AnalysisResult({
 
             {description && (
               <p className="text-xs text-gray-600 mt-3">
-                Planned for: {description}
+                Planned for:{' '}
+                {description}
               </p>
             )}
 
@@ -633,16 +1233,19 @@ function AnalysisResult({
 
       </div>
 
-      {/* WARNINGS */}
-      {analysis.warnings.length > 0 && (
+      {analysis.warnings
+        .length > 0 && (
+
         <div className="mt-4 space-y-2">
 
           {analysis.warnings.map(
             (warning, index) => (
+
               <div
                 key={index}
                 className="flex items-start gap-2 text-xs text-gray-400"
               >
+
                 <span
                   className={`w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0 ${
                     isCaution
@@ -651,17 +1254,38 @@ function AnalysisResult({
                   }`}
                 />
 
-                <span>{warning}</span>
+                <span>
+                  {warning}
+                </span>
+
               </div>
+
             )
           )}
 
         </div>
+
       )}
 
-      {/* CATEGORY */}
-      <div className="mt-4 text-xs text-gray-600">
-        Category: {category}
+      <div className="mt-4 flex items-center justify-between text-xs text-gray-600">
+
+        <span>
+          Category:{' '}
+          <span className="text-gray-400">
+            {category}
+          </span>
+        </span>
+
+        <span>
+          This month:{' '}
+          <span className="text-gray-400">
+            ₹
+            {analysis.currentMonthSpent.toLocaleString(
+              'en-IN'
+            )}
+          </span>
+        </span>
+
       </div>
 
     </div>
@@ -736,114 +1360,4 @@ function MetricBox({
   );
 }
 
-/* ============================================================
-   DATA HELPERS
-============================================================ */
-
-/*
-  These functions deliberately return empty/zero values
-  instead of using mock data.
-
-  This prevents fake information such as:
-  ₹3,160 balance
-  ₹350 daily limit
-  Food 41%
-  etc.
-*/
-
-function getCurrentBalance(): number {
-  try {
-    const stored =
-      localStorage.getItem('smartspend_balance');
-
-    if (!stored) {
-      return 0;
-    }
-
-    const value = Number(stored);
-
-    return Number.isFinite(value)
-      ? value
-      : 0;
-  } catch {
-    return 0;
-  }
-}
-
-function getMonthlyBudget(): number {
-  try {
-    const stored =
-      localStorage.getItem('smartspend_budget');
-
-    if (!stored) {
-      return 0;
-    }
-
-    const parsed = JSON.parse(stored);
-
-    if (typeof parsed === 'number') {
-      return parsed;
-    }
-
-    if (
-      parsed &&
-      typeof parsed.totalBudget === 'number'
-    ) {
-      return parsed.totalBudget;
-    }
-
-    if (
-      parsed &&
-      typeof parsed.amount === 'number'
-    ) {
-      return parsed.amount;
-    }
-
-    return 0;
-  } catch {
-    return 0;
-  }
-}
-
-function getCategorySpent(
-  category: Category
-): number {
-  try {
-    const stored =
-      localStorage.getItem(
-        'smartspend_transactions'
-      );
-
-    if (!stored) {
-      return 0;
-    }
-
-    const transactions = JSON.parse(stored);
-
-    if (!Array.isArray(transactions)) {
-      return 0;
-    }
-
-    return transactions.reduce(
-      (total: number, transaction: any) => {
-        const transactionCategory =
-          transaction.category;
-
-        const transactionAmount =
-          Number(transaction.amount);
-
-        if (
-          transactionCategory === category &&
-          Number.isFinite(transactionAmount)
-        ) {
-          return total + transactionAmount;
-        }
-
-        return total;
-      },
-      0
-    );
-  } catch {
-    return 0;
-  }
-}
+export default AskPage;
