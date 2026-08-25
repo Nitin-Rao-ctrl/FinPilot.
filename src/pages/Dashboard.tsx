@@ -32,6 +32,7 @@ import { Link } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 
 import { CountUp, Reveal } from '@/lib/animations';
+import { supabase } from '@/lib/supabase';
 
 const PIE_COLORS = [
   '#00FF88',
@@ -64,6 +65,7 @@ export function DashboardPage() {
 
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
+  const [userName, setUserName] = useState('User');
 
   /* ============================================================
      LOAD TRANSACTIONS
@@ -102,6 +104,31 @@ export function DashboardPage() {
       .finally(() => {
         setLoading(false);
       });
+  }, []);
+
+  /* ============================================================
+     LOAD LOGGED-IN USER
+  ============================================================ */
+
+  useEffect(() => {
+    async function loadUserName() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) return;
+
+      const name =
+        user.user_metadata?.full_name ||
+        user.user_metadata?.name ||
+        user.user_metadata?.user_name ||
+        user.email?.split('@')[0] ||
+        'User';
+
+      setUserName(name);
+    }
+
+    loadUserName();
   }, []);
 
   /* ============================================================
@@ -576,7 +603,7 @@ export function DashboardPage() {
         <div>
 
           <h1 className="text-2xl font-bold text-white">
-            Good evening, Nitin.
+            Welcome, {userName}.
           </h1>
 
           <p className="text-sm text-gray-500 mt-0.5">
