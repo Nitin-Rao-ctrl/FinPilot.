@@ -269,7 +269,7 @@ export function TransactionsPage() {
         try {
           const response =
             await fetch(
-              'http://localhost:5000/api/transactions'
+              'https://finpilot-backend-23iz.onrender.com/api/transactions'
             );
 
           if (!response.ok) {
@@ -395,7 +395,7 @@ export function TransactionsPage() {
     try {
       const response =
         await fetch(
-          `http://localhost:5000/api/transactions/${id}`,
+          `https://finpilot-backend-23iz.onrender.com/api/transactions/${id}`,
           {
             method: 'DELETE',
           }
@@ -433,7 +433,7 @@ export function TransactionsPage() {
     try {
       const response =
         await fetch(
-          'http://localhost:5000/api/transactions',
+          'https://finpilot-backend-23iz.onrender.com/api/transactions',
           {
             method: 'POST',
             headers: {

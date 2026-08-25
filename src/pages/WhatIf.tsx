@@ -26,7 +26,7 @@ type Goal = {
   status?: string;
 };
 
-const API_URL = 'http://localhost:5000/api/transactions';
+const API_URL = 'https://finpilot-backend-23iz.onrender.com/api/transactions';
 
 const GOAL_STORAGE_KEY = 'smartspend_goals';
 

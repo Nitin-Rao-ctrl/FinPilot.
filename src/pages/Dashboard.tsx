@@ -72,7 +72,7 @@ export function DashboardPage() {
   useEffect(() => {
     setLoading(true);
 
-    fetch('http://localhost:5000/api/transactions')
+    fetch('https://finpilot-backend-23iz.onrender.com/api/transactions')
       .then((res) => {
         if (!res.ok) {
           throw new Error(

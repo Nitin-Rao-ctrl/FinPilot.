@@ -40,7 +40,7 @@ export function InsightsPage() {
   const [transactions, setTransactions] = useState<any[]>([]);
 
   useEffect(() => {
-    fetch('http://localhost:5000/api/transactions')
+    fetch('https://finpilot-backend-23iz.onrender.com/api/transactions')
       .then((res) => res.json())
       .then((data) => setTransactions(data))
       .catch((err) =>

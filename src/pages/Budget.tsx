@@ -24,7 +24,7 @@ type Category = {
   percentage: number;
 };
 
-const API_URL = 'http://localhost:5000';
+const API_URL = 'https://finpilot-backend-23iz.onrender.com';
 
 function isCurrentMonth(dateValue: string) {
   const date = new Date(dateValue);

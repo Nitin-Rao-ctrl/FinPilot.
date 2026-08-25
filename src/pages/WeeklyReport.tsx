@@ -14,7 +14,7 @@ export function WeeklyReportPage() {
   const [generating, setGenerating] = useState(false);
 
   useEffect(() => {
-    fetch('http://localhost:5000/api/transactions')
+    fetch('https://finpilot-backend-23iz.onrender.com/api/transactions')
       .then((res) => res.json())
       .then((data) => setTransactions(data))
       .catch((err) =>
