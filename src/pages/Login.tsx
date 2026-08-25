@@ -1,5 +1,10 @@
 import { useState } from 'react';
-import { ArrowLeft, CheckCircle2, LockKeyhole, Phone } from 'lucide-react';
+import {
+  ArrowLeft,
+  CheckCircle2,
+  LockKeyhole,
+  Phone,
+} from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 
@@ -14,6 +19,9 @@ export function LoginPage() {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
+  // ================================
+  // GOOGLE LOGIN
+  // ================================
   async function handleGoogleLogin() {
     setLoading(true);
     setError('');
@@ -33,10 +41,13 @@ export function LoginPage() {
     }
   }
 
+  // ================================
+  // NORMALIZE PHONE NUMBER
+  // ================================
   function normalizePhone(value: string) {
     const cleaned = value.replace(/\D/g, '');
 
-    if (cleaned.startsWith('91')) {
+    if (cleaned.startsWith('91') && cleaned.length === 12) {
       return `+${cleaned}`;
     }
 
@@ -49,6 +60,9 @@ export function LoginPage() {
       : `+${cleaned}`;
   }
 
+  // ================================
+  // SEND OTP
+  // ================================
   async function handleSendOtp(
     event: React.FormEvent
   ) {
@@ -83,11 +97,15 @@ export function LoginPage() {
 
     setPhone(normalizedPhone);
     setOtpSent(true);
+
     setMessage(
       'OTP sent successfully. Check your phone.'
     );
   }
 
+  // ================================
+  // VERIFY OTP
+  // ================================
   async function handleVerifyOtp(
     event: React.FormEvent
   ) {
@@ -131,6 +149,9 @@ export function LoginPage() {
     navigate('/dashboard');
   }
 
+  // ================================
+  // BACK FROM OTP
+  // ================================
   function handleBack() {
     setOtp('');
     setOtpSent(false);
@@ -138,19 +159,22 @@ export function LoginPage() {
     setMessage('');
   }
 
+  // ================================
+  // UI
+  // ================================
   return (
     <div className="min-h-screen bg-[#050505] text-gray-200 grid-bg flex items-center justify-center px-4">
 
+      {/* Background */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
-
         <div className="absolute top-[10%] left-[10%] w-[400px] h-[400px] bg-emerald-500/[0.05] rounded-full blur-[120px]" />
 
         <div className="absolute bottom-[10%] right-[10%] w-[350px] h-[350px] bg-emerald-600/[0.04] rounded-full blur-[100px]" />
-
       </div>
 
       <div className="relative w-full max-w-md">
 
+        {/* Back */}
         <Link
           to="/"
           className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-white transition-colors mb-6"
@@ -159,19 +183,17 @@ export function LoginPage() {
           Back to home
         </Link>
 
+        {/* Login Card */}
         <div className="glass rounded-3xl p-6 md:p-8 neon-border">
 
           {/* Logo */}
-
           <div className="text-center mb-8">
 
             <div className="w-12 h-12 mx-auto rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center glow-emerald">
-
               <LockKeyhole
                 className="w-6 h-6 text-[#050505]"
                 strokeWidth={2.5}
               />
-
             </div>
 
             <h1 className="text-2xl font-bold text-white mt-4">
@@ -181,11 +203,11 @@ export function LoginPage() {
             <p className="text-sm text-gray-500 mt-1">
               Sign in to manage your finances
             </p>
-
           </div>
 
-          {/* Google */}
-
+          {/* ================================
+              GOOGLE LOGIN
+          ================================= */}
           <button
             type="button"
             onClick={handleGoogleLogin}
@@ -202,7 +224,6 @@ export function LoginPage() {
           </button>
 
           {/* Divider */}
-
           <div className="flex items-center gap-3 my-6">
 
             <div className="flex-1 h-px bg-white/[0.07]" />
@@ -215,8 +236,9 @@ export function LoginPage() {
 
           </div>
 
-          {/* Phone */}
-
+          {/* ================================
+              PHONE LOGIN
+          ================================= */}
           {!otpSent ? (
 
             <form
@@ -240,6 +262,8 @@ export function LoginPage() {
                     onChange={(e) =>
                       setPhone(
                         e.target.value
+                          .replace(/\D/g, '')
+                          .slice(0, 10)
                       )
                     }
                     placeholder="9876543210"
@@ -268,6 +292,10 @@ export function LoginPage() {
             </form>
 
           ) : (
+
+            /* ================================
+               OTP VERIFICATION
+            ================================= */
 
             <form
               onSubmit={handleVerifyOtp}
@@ -325,13 +353,12 @@ export function LoginPage() {
               </button>
 
             </form>
-
           )}
 
-          {/* Message */}
-
+          {/* ================================
+              SUCCESS MESSAGE
+          ================================= */}
           {message && (
-
             <div className="mt-4 flex items-start gap-2 rounded-xl border border-emerald-400/10 bg-emerald-400/[0.04] p-3">
 
               <CheckCircle2 className="w-4 h-4 text-emerald-400 mt-0.5 flex-shrink-0" />
@@ -341,13 +368,12 @@ export function LoginPage() {
               </p>
 
             </div>
-
           )}
 
-          {/* Error */}
-
+          {/* ================================
+              ERROR MESSAGE
+          ================================= */}
           {error && (
-
             <div className="mt-4 rounded-xl border border-red-400/10 bg-red-400/[0.04] p-3">
 
               <p className="text-xs text-red-300">
@@ -355,9 +381,9 @@ export function LoginPage() {
               </p>
 
             </div>
-
           )}
 
+          {/* Terms */}
           <p className="text-[10px] text-gray-600 text-center mt-6 leading-relaxed">
             By continuing, you agree to use FINPILOT
             responsibly for your personal financial
@@ -365,9 +391,7 @@ export function LoginPage() {
           </p>
 
         </div>
-
       </div>
-
     </div>
   );
 }
