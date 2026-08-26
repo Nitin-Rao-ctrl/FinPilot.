@@ -1338,12 +1338,7 @@ function GoalPlanPreview({
           )}
         />
 
-        <PlanStat
-          label="Per Day"
-          value={formatMoney(
-            daily
-          )}
-        />
+        
 
       </div>
 
