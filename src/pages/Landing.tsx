@@ -94,7 +94,7 @@ export function LandingPage() {
 </Link>
 
             <Link
-              to="/dashboard"
+              to="/login"
               className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-400 text-[#050505] text-sm font-semibold hover:bg-emerald-300 transition-all glow-emerald"
             >
               Get Started
@@ -154,7 +154,7 @@ export function LandingPage() {
                 <div className="flex flex-col sm:flex-row gap-3 pt-2">
 
                   <Link
-                    to="/dashboard"
+                    to="/login"
                     className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-emerald-400 text-[#050505] font-semibold text-sm hover:bg-emerald-300 transition-all glow-emerald"
                   >
                     Start Managing Money
@@ -511,7 +511,7 @@ export function LandingPage() {
               </p>
 
               <Link
-                to="/dashboard"
+                to="/login"
                 className="inline-flex items-center gap-2 mt-8 px-7 py-4 rounded-xl bg-emerald-400 text-[#050505] font-bold hover:bg-emerald-300 transition-all glow-emerald"
               >
                 Enter FINPILOT
@@ -745,3 +745,4 @@ function PreviewCard({
 }
 
 export default LandingPage;
+
