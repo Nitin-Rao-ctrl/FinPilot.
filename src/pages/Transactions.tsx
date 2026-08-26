@@ -308,6 +308,7 @@ useEffect(() => {
       setTransactions([]);
     }
   };
+  
 
   fetchTransactions();
 }, []);
@@ -457,13 +458,43 @@ useEffect(() => {
         }),
       }
     );
+async function handleAdd(data: any) {
+  try {
+    const userId = await getUserId();
+
+    console.log('ADDING TRANSACTION');
+    console.log('USER ID:', userId);
+    console.log('DATA:', data);
+
+    const response = await fetch(
+      'https://finpilot-backend-23iz.onrender.com/api/transactions',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...data,
+          userId,
+        }),
+      }
+    );
+
+    console.log('RESPONSE STATUS:', response.status);
 
     if (!response.ok) {
-  const errorText = await response.text();
-  console.error('Backend error:', response.status, errorText);
-  throw new Error(`Backend error ${response.status}: ${errorText}`);
-}
+      const errorText = await response.text();
+
+      alert(
+        `Backend Error ${response.status}\n\n${errorText}`
+      );
+
+      throw new Error('Failed to save transaction');
+    }
+
     const savedTransaction = await response.json();
+
+    console.log('SAVED:', savedTransaction);
 
     setTransactions((prev) => [
       savedTransaction,
@@ -472,13 +503,18 @@ useEffect(() => {
 
     setShowForm(false);
     setEditing(null);
-  } catch (error) {
+
+  } catch (error: any) {
     console.error(
       'Error saving transaction:',
       error
     );
 
-    alert('Failed to save transaction');
+    alert(
+      `Failed to save transaction\n\n${
+        error?.message || error
+      }`
+    );
   }
 }
 
