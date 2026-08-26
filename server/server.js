@@ -3,6 +3,10 @@ const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
 const connectDB = require("./config/db");
+const userKey = user.id;
+
+const BUDGET_KEY = `smartspend_budget_${userKey}`;
+const GOALS_KEY = `smartspend_goals_${userKey}`;
 
 
 
