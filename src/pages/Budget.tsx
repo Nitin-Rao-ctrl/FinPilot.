@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 
 import { Reveal } from '@/lib/animations';
+import { supabase } from '@/lib/supabase';
 
 type Transaction = {
   _id?: string;
@@ -82,48 +83,53 @@ export function BudgetPage() {
     fetchTransactions();
   }, []);
 
-  async function fetchTransactions() {
-    try {
-      setLoading(true);
-      setError('');
+ async function fetchTransactions() {
+  try {
+    setLoading(true);
+    setError('');
 
-      const response = await fetch(
-        `${API_URL}/api/transactions?userId=${encodeURIComponent(user.id)}
-      );
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
 
-      if (!response.ok) {
-        throw new Error(
-          'Failed to fetch transactions'
-        );
-      }
-
-      const data =
-        await response.json();
-
-      const transactionList: Transaction[] =
-        Array.isArray(data)
-          ? data
-          : [];
-
-      setTransactions(
-        transactionList
-      );
-    } catch (error) {
-      console.error(
-        'Failed to fetch transactions:',
-        error
-      );
-
-      setError(
-        'Could not load transaction data.'
-      );
-
-      setTransactions([]);
-    } finally {
-      setLoading(false);
+    if (userError || !user) {
+      throw new Error('User is not logged in');
     }
-  }
 
+    const response = await fetch(
+      `${API_URL}/api/transactions?userId=${encodeURIComponent(user.id)}`
+    );
+
+    if (!response.ok) {
+      throw new Error(
+        'Failed to fetch transactions'
+      );
+    }
+
+    const data = await response.json();
+
+    const transactionList: Transaction[] =
+      Array.isArray(data)
+        ? data
+        : [];
+
+    setTransactions(transactionList);
+  } catch (error) {
+    console.error(
+      'Failed to fetch transactions:',
+      error
+    );
+
+    setError(
+      'Could not load transaction data.'
+    );
+
+    setTransactions([]);
+  } finally {
+    setLoading(false);
+  }
+}
   /* ==========================================================
      CURRENT MONTH EXPENSES
   ========================================================== */
