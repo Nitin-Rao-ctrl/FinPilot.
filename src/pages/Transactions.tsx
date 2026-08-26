@@ -441,7 +441,7 @@ useEffect(() => {
 );
   }
 }
-  async function handleAdd(data: any) {
+async function handleAdd(data: any) {
   try {
     const userId = await getUserId();
 
@@ -1404,3 +1404,4 @@ function FormField({
     </div>
   );
 }
+
