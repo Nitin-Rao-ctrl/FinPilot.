@@ -415,8 +415,10 @@ useEffect(() => {
     );
 
     if (!response.ok) {
-      throw new Error('Failed to delete transaction');
-    }
+  const errorText = await response.text();
+  console.error('Backend error:', response.status, errorText);
+  throw new Error(`Backend error ${response.status}: ${errorText}`);
+}
 
     setTransactions((prev) =>
       prev.filter(
@@ -431,7 +433,11 @@ useEffect(() => {
       error
     );
 
-    alert('Failed to delete transaction');
+    alert(
+  error instanceof Error
+    ? error.message
+    : 'Failed to save transaction'
+);
   }
 }
   async function handleAdd(data: any) {
