@@ -459,9 +459,10 @@ useEffect(() => {
     );
 
     if (!response.ok) {
-      throw new Error('Failed to save transaction');
-    }
-
+  const errorText = await response.text();
+  console.error('Backend error:', response.status, errorText);
+  throw new Error(`Backend error ${response.status}: ${errorText}`);
+}
     const savedTransaction = await response.json();
 
     setTransactions((prev) => [
