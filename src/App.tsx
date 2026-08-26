@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import type { ComponentType } from 'react';
 
 import { LandingPage } from '@/pages/Landing';
 import { AppLayout } from '@/layouts/AppLayout';
@@ -15,6 +16,9 @@ import { ProfilePage } from '@/pages/Profile';
 import { SettingsPage } from '@/pages/settings';
 import { WhatIfPage } from '@/pages/WhatIf';
 import { LoginPage } from '@/pages/Login';
+
+// Keep the route usable until TransactionsPage's return type is corrected.
+const TransactionsPageComponent = TransactionsPage as unknown as ComponentType;
 
 export default function App() {
   return (
@@ -55,7 +59,7 @@ export default function App() {
           {/* Transactions */}
           <Route
             path="/transactions"
-            element={<TransactionsPage />}
+            element={<TransactionsPageComponent />}
           />
 
           {/* Insights */}
