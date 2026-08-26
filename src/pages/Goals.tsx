@@ -1285,12 +1285,7 @@ function GoalPlanPreview({
       deadline
     );
 
-  const daily =
-    calculateRequiredDaily(
-      targetAmount,
-      savedAmount,
-      deadline
-    );
+  
 
   const status =
     calculateStatus(
