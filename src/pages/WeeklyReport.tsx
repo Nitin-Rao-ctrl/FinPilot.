@@ -7,21 +7,54 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { Reveal } from '@/lib/animations';
+import { supabase } from '@/lib/supabase';
 
 export function WeeklyReportPage() {
   const [transactions, setTransactions] = useState<any[]>([]);
   const [generated, setGenerated] = useState(true);
   const [generating, setGenerating] = useState(false);
 
-  useEffect(() => {
-    fetch('https://finpilot-backend-23iz.onrender.com/api/transactions')
-      .then((res) => res.json())
-      .then((data) => setTransactions(data))
-      .catch((err) =>
-        console.error('Failed to fetch transactions:', err)
-      );
-  }, []);
+ useEffect(() => {
+  async function loadTransactions() {
+    try {
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
 
+      if (userError || !user) {
+        throw new Error('User is not logged in');
+      }
+
+      const response = await fetch(
+        `https://finpilot-backend-23iz.onrender.com/api/transactions?userId=${encodeURIComponent(
+          user.id
+        )}`
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          `Transaction API returned ${response.status}`
+        );
+      }
+
+      const data = await response.json();
+
+      setTransactions(
+        Array.isArray(data) ? data : []
+      );
+    } catch (error) {
+      console.error(
+        'Error loading weekly report transactions:',
+        error
+      );
+
+      setTransactions([]);
+    }
+  }
+
+  loadTransactions();
+}, []);
   const now = new Date();
 
   const weekStart = new Date(now);

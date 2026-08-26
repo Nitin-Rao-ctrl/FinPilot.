@@ -8,6 +8,7 @@ import {
   ArrowRight,
 } from 'lucide-react';
 import { Reveal } from '@/lib/animations';
+import { supabase } from '@/lib/supabase';
 
 type Transaction = {
   id?: string | number;
@@ -102,15 +103,28 @@ export function WhatIfPage() {
     setLoading(false);
   }
 
-  async function loadTransactions() {
-    try {
-      const response = await fetch(API_URL);
+ async function loadTransactions() {
+  try {
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch transactions');
-      }
+    if (userError || !user) {
+      throw new Error('User is not logged in');
+    }
 
-      const data = await response.json();
+    const response = await fetch(
+      `${API_URL}?userId=${encodeURIComponent(user.id)}`
+    );
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch transactions');
+    }
+
+    const data = await response.json();
+
+    // ...
 
       const list = Array.isArray(data)
         ? data

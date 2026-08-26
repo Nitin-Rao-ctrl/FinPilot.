@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 
 import { Reveal } from '@/lib/animations';
+import { supabase } from '@/lib/supabase';
 
 type Category =
   | 'Food'
@@ -56,7 +57,7 @@ type Analysis = {
   warnings: string[];
 };
 
-const API_URL = 'https://finpilot-backend-23iz.onrender.com';
+const API_URL = 'http://localhost:5000';
 
 const CATEGORIES: Category[] = [
   'Food',
@@ -252,10 +253,20 @@ export function AskPage() {
       setLoadingData(true);
       setDataError('');
 
-      const response =
-        await fetch(
-          `${API_URL}/api/transactions`
-        );
+      const {
+  data: { user },
+  error: userError,
+} = await supabase.auth.getUser();
+
+if (userError || !user) {
+  throw new Error('User is not logged in');
+}
+
+const response = await fetch(
+  `${API_URL}/api/transactions?userId=${encodeURIComponent(
+    user.id
+  )}`
+);
 
       if (!response.ok) {
         throw new Error(
@@ -1360,4 +1371,4 @@ function MetricBox({
   );
 }
 
-export default AskPage;
+export default AskPage;   

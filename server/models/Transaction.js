@@ -2,6 +2,12 @@ const mongoose = require('mongoose');
 
 const transactionSchema = new mongoose.Schema(
   {
+    userId: {
+      type: String,
+      required: true,
+      index: true,
+    },
+
     type: {
       type: String,
       enum: ['income', 'expense'],

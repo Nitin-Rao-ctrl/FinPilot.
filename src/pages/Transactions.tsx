@@ -18,6 +18,19 @@ import {
 } from 'lucide-react';
 
 import { Reveal } from '@/lib/animations';
+import { supabase } from '@/lib/supabase';
+async function getUserId() {
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
+
+  if (error || !user) {
+    throw new Error('User is not logged in');
+  }
+
+  return user.id;
+}
 
 const CATEGORIES = [
   'Food',
@@ -262,41 +275,42 @@ function predictCategory(
 export function TransactionsPage() {
   const [transactions, setTransactions] =
     useState<any[]>([]);
+useEffect(() => {
+  const fetchTransactions = async () => {
+    try {
+      const userId = await getUserId();
 
-  useEffect(() => {
-    const fetchTransactions =
-      async () => {
-        try {
-          const response =
-            await fetch(
-              'https://finpilot-backend-23iz.onrender.com/api/transactions'
-            );
+      const response = await fetch(
+        `https://finpilot-backend-23iz.onrender.com/api/transactions?userId=${encodeURIComponent(
+          userId
+        )}`
+      );
 
-          if (!response.ok) {
-            throw new Error(
-              'Failed to fetch transactions'
-            );
-          }
+      if (!response.ok) {
+        throw new Error(
+          'Failed to fetch transactions'
+        );
+      }
 
-          const data =
-            await response.json();
+      const data = await response.json();
 
-          setTransactions(
-            Array.isArray(data)
-              ? data
-              : []
-          );
-        } catch (error) {
-          console.error(
-            'Error fetching transactions:',
-            error
-          );
-        }
-      };
+      setTransactions(
+        Array.isArray(data)
+          ? data
+          : []
+      );
+    } catch (error) {
+      console.error(
+        'Error fetching transactions:',
+        error
+      );
 
-    fetchTransactions();
-  }, []);
+      setTransactions([]);
+    }
+  };
 
+  fetchTransactions();
+}, []);
   const [search, setSearch] =
     useState('');
 
@@ -389,90 +403,77 @@ export function TransactionsPage() {
     sortBy,
   ]);
 
-  async function handleDelete(
-    id: string
-  ) {
-    try {
-      const response =
-        await fetch(
-          `https://finpilot-backend-23iz.onrender.com/api/transactions/${id}`,
-          {
-            method: 'DELETE',
-          }
-        );
+  async function handleDelete(id: string) {
+  try {
+    const userId = await getUserId();
 
-      if (!response.ok) {
-        throw new Error(
-          'Failed to delete transaction'
-        );
+    const response = await fetch(
+      `https://finpilot-backend-23iz.onrender.com/api/transactions/${id}?userId=${encodeURIComponent(userId)}`,
+      {
+        method: 'DELETE',
       }
+    );
 
-      setTransactions(
-        (prev) =>
-          prev.filter(
-            (t) =>
-              t._id !== id &&
-              t.id !== id
-          )
-      );
-    } catch (error) {
-      console.error(
-        'Error deleting transaction:',
-        error
-      );
-
-      alert(
-        'Failed to delete transaction'
-      );
+    if (!response.ok) {
+      throw new Error('Failed to delete transaction');
     }
+
+    setTransactions((prev) =>
+      prev.filter(
+        (t) =>
+          t._id !== id &&
+          t.id !== id
+      )
+    );
+  } catch (error) {
+    console.error(
+      'Error deleting transaction:',
+      error
+    );
+
+    alert('Failed to delete transaction');
   }
+}
+  async function handleAdd(data: any) {
+  try {
+    const userId = await getUserId();
 
-  async function handleAdd(
-    data: any
-  ) {
-    try {
-      const response =
-        await fetch(
-          'https://finpilot-backend-23iz.onrender.com/api/transactions',
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type':
-                'application/json',
-            },
-            body: JSON.stringify(
-              data
-            ),
-          }
-        );
-
-      if (!response.ok) {
-        throw new Error(
-          'Failed to save transaction'
-        );
+    const response = await fetch(
+      'https://finpilot-backend-23iz.onrender.com/api/transactions',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...data,
+          userId,
+        }),
       }
+    );
 
-      const savedTransaction =
-        await response.json();
-
-      setTransactions((prev) => [
-        savedTransaction,
-        ...prev,
-      ]);
-
-      setShowForm(false);
-      setEditing(null);
-    } catch (error) {
-      console.error(
-        'Error saving transaction:',
-        error
-      );
-
-      alert(
-        'Failed to save transaction'
-      );
+    if (!response.ok) {
+      throw new Error('Failed to save transaction');
     }
+
+    const savedTransaction = await response.json();
+
+    setTransactions((prev) => [
+      savedTransaction,
+      ...prev,
+    ]);
+
+    setShowForm(false);
+    setEditing(null);
+  } catch (error) {
+    console.error(
+      'Error saving transaction:',
+      error
+    );
+
+    alert('Failed to save transaction');
   }
+}
 
   return (
     <div className="space-y-6">

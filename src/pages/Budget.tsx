@@ -88,7 +88,7 @@ export function BudgetPage() {
       setError('');
 
       const response = await fetch(
-        `${API_URL}/api/transactions`
+        `${API_URL}/api/transactions?userId=${encodeURIComponent(user.id)}
       );
 
       if (!response.ok) {

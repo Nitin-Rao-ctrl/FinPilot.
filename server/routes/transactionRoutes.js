@@ -3,58 +3,169 @@ const Transaction = require('../models/Transaction');
 
 const router = express.Router();
 
-// GET all transactions
+/*
+  GET all transactions for one user
+
+  Example:
+  GET /api/transactions?userId=abc123
+*/
 router.get('/', async (req, res) => {
   try {
-    const transactions = await Transaction.find().sort({ date: -1 });
+    const { userId } = req.query;
+
+    if (!userId) {
+      return res.status(400).json({
+        message: 'userId is required',
+      });
+    }
+
+    const transactions = await Transaction.find({
+      userId,
+    }).sort({ date: -1 });
+
     res.json(transactions);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error('GET transactions error:', error);
+
+    res.status(500).json({
+      message: error.message,
+    });
   }
 });
 
-// POST a new transaction
+
+/*
+  CREATE transaction
+*/
 router.post('/', async (req, res) => {
   try {
-    const transaction = await Transaction.create(req.body);
+    const {
+      userId,
+      type,
+      amount,
+      category,
+      description,
+      merchant,
+      date,
+    } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({
+        message: 'userId is required',
+      });
+    }
+
+    const transaction = await Transaction.create({
+      userId,
+      type,
+      amount,
+      category,
+      description,
+      merchant,
+      date,
+    });
+
     res.status(201).json(transaction);
   } catch (error) {
-    res.status(400).json({ message: error.message });
+    console.error('POST transaction error:', error);
+
+    res.status(400).json({
+      message: error.message,
+    });
   }
 });
 
-// UPDATE a transaction
+
+/*
+  UPDATE transaction
+
+  Only the owner can update it.
+*/
 router.put('/:id', async (req, res) => {
   try {
-    const transaction = await Transaction.findByIdAndUpdate(
-      req.params.id,
-      req.body,
-      { new: true, runValidators: true }
+    const { userId } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({
+        message: 'userId is required',
+      });
+    }
+
+    const transaction = await Transaction.findOneAndUpdate(
+      {
+        _id: req.params.id,
+        userId,
+      },
+      {
+        $set: {
+          type: req.body.type,
+          amount: req.body.amount,
+          category: req.body.category,
+          description: req.body.description,
+          merchant: req.body.merchant,
+          date: req.body.date,
+        },
+      },
+      {
+        new: true,
+        runValidators: true,
+      }
     );
 
     if (!transaction) {
-      return res.status(404).json({ message: 'Transaction not found' });
+      return res.status(404).json({
+        message: 'Transaction not found',
+      });
     }
 
     res.json(transaction);
   } catch (error) {
-    res.status(400).json({ message: error.message });
+    console.error('UPDATE transaction error:', error);
+
+    res.status(400).json({
+      message: error.message,
+    });
   }
 });
 
-// DELETE a transaction
+
+/*
+  DELETE transaction
+
+  Only the owner can delete it.
+*/
 router.delete('/:id', async (req, res) => {
   try {
-    const transaction = await Transaction.findByIdAndDelete(req.params.id);
+    const { userId } = req.query;
 
-    if (!transaction) {
-      return res.status(404).json({ message: 'Transaction not found' });
+    if (!userId) {
+      return res.status(400).json({
+        message: 'userId is required',
+      });
     }
 
-    res.json({ message: 'Transaction deleted successfully' });
+    const transaction = await Transaction.findOneAndDelete({
+      _id: req.params.id,
+      userId,
+    });
+
+    if (!transaction) {
+      return res.status(404).json({
+        message: 'Transaction not found',
+      });
+    }
+
+    res.json({
+      message: 'Transaction deleted successfully',
+    });
   } catch (error) {
-    res.status(400).json({ message: error.message });
+    console.error('DELETE transaction error:', error);
+
+    res.status(400).json({
+      message: error.message,
+    });
   }
 });
+
 
 module.exports = router;
