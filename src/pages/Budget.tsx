@@ -100,22 +100,35 @@ export function BudgetPage() {
         return;
       }
 
-      const res = await fetch(
-        'http://localhost:5000/api/transactions'
-      );
+      const API_URL =
+  'https://finpilot-backend-23iz.onrender.com';
 
-      if (!res.ok) {
-        throw new Error(
-          'Failed to fetch transactions'
-        );
-      }
+const res = await fetch(
+  `${API_URL}/api/transactions?userId=${encodeURIComponent(user.id)}`
+);
 
-      const transactions = await res.json();
+if (!res.ok) {
+  const errorText = await res.text();
 
-      const expenses = transactions.filter(
-        (t: any) => t.type === 'expense'
-      );
+  throw new Error(
+    `Failed to fetch transactions: ${res.status} ${errorText}`
+  );
+}
 
+const data = await res.json();
+
+const transactions = Array.isArray(data)
+  ? data
+  : Array.isArray(data?.transactions)
+    ? data.transactions
+    : [];
+
+const expenses = transactions.filter(
+  (t: any) =>
+    String(t.type || '').toLowerCase() === 'expense' ||
+    String(t.type || '').toLowerCase() === 'debit' ||
+    String(t.type || '').toLowerCase() === 'spent'
+);
       const totalSpent = expenses.reduce(
         (sum: number, t: any) =>
           sum + Number(t.amount || 0),
