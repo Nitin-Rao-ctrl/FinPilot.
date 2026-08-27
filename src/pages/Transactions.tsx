@@ -763,57 +763,79 @@ export function TransactionsPage() {
   /* ==========================================================
      DELETE
   ========================================================== */
+async function handleDelete(transaction: Transaction) {
+  const id = transaction._id || transaction.id;
 
-  async function handleDelete(
-    transaction: Transaction,
-  ) {
-    const id =
-      transaction.id ||
-      transaction._id;
-
-    if (!id) {
-      return;
-    }
-
-    const confirmed =
-      window.confirm(
-        "Delete this transaction?",
-      );
-
-    if (!confirmed) {
-      return;
-    }
-
-    try {
-      setActionLoading(true);
-
-      const response = await fetch(
-        `${API_BASE}/transactions/${id}`,
-        {
-          method: "DELETE",
-        },
-      );
-
-      if (!response.ok) {
-        throw new Error(
-          `Delete failed: ${response.status}`,
-        );
-      }
-
-      await fetchTransactions();
-    } catch (error) {
-      console.error(
-        "Error deleting transaction:",
-        error,
-      );
-
-      alert(
-        "Could not delete transaction.",
-      );
-    } finally {
-      setActionLoading(false);
-    }
+  if (!id) {
+    alert("Transaction ID is missing.");
+    return;
   }
+
+  const confirmed = window.confirm(
+    "Are you sure you want to delete this transaction?",
+  );
+
+  if (!confirmed) {
+    return;
+  }
+
+  try {
+    setActionLoading(true);
+
+    const userId = await getUserId();
+
+    console.log("DELETE TRANSACTION");
+    console.log("Transaction ID:", id);
+    console.log("User ID:", userId);
+
+    const url =
+      `${API_BASE}/transactions/${encodeURIComponent(id)}` +
+      `?userId=${encodeURIComponent(userId)}`;
+
+    console.log("DELETE URL:", url);
+
+    const response = await fetch(url, {
+      method: "DELETE",
+      headers: {
+        Accept: "application/json",
+      },
+    });
+
+    const responseText = await response.text();
+
+    console.log("DELETE STATUS:", response.status);
+    console.log("DELETE RESPONSE:", responseText);
+
+    if (!response.ok) {
+      throw new Error(
+        `Delete failed (${response.status}): ${
+          responseText || "Unknown backend error"
+        }`,
+      );
+    }
+
+    // Remove from UI only after backend confirms deletion
+    setTransactions((previous) =>
+      previous.filter(
+        (item) =>
+          item._id !== id &&
+          item.id !== id,
+      ),
+    );
+
+    alert("Transaction deleted successfully.");
+  } catch (error) {
+    console.error("Error deleting transaction:", error);
+
+    alert(
+      error instanceof Error
+        ? error.message
+        : "Could not delete transaction.",
+    );
+  } finally {
+    setActionLoading(false);
+  }
+}
 
   /* ==========================================================
      UI
