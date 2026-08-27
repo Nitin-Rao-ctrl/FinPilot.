@@ -87,30 +87,38 @@ const CATEGORIES = [
 
 const CATEGORY_RULES: Record<string, string[]> = {
   Food: [
-    "zomato",
-    "swiggy",
-    "food",
-    "restaurant",
-    "cafe",
-    "café",
-    "pizza",
-    "burger",
-    "domino",
-    "mcdonald",
-    "kfc",
-    "starbucks",
-    "bakery",
-    "grocery",
-    "groceries",
-    "blinkit",
-    "zepto",
-    "instamart",
-    "eat",
-    "lunch",
-    "dinner",
-    "breakfast",
-  ],
-
+  "zomato",
+  "swiggy",
+  "food",
+  "restaurant",
+  "cafe",
+  "café",
+  "pizza",
+  "burger",
+  "domino",
+  "mcdonald",
+  "kfc",
+  "starbucks",
+  "bakery",
+  "grocery",
+  "groceries",
+  "blinkit",
+  "zepto",
+  "instamart",
+  "eat",
+  "lunch",
+  "dinner",
+  "breakfast",
+  "chocolate",
+  "chocolates",
+  "snack",
+  "snacks",
+  "dessert",
+  "desserts",
+  "cake",
+  "ice cream",
+  "icecream",
+],
   Travel: [
     "uber",
     "ola",
@@ -244,19 +252,60 @@ const CATEGORY_RULES: Record<string, string[]> = {
    CATEGORY PREDICTOR
 ============================================================ */
 
-function predictCategory(description: string, merchant: string): string {
-  const text = `${description} ${merchant}`.toLowerCase().trim();
+function predictCategory(
+  description: string,
+  merchant: string,
+): string {
+  const text = `${description} ${merchant}`
+    .toLowerCase()
+    .trim();
 
   if (!text) {
     return "Other";
   }
 
-  for (const category of CATEGORIES) {
+  // Check categories in a fixed priority order.
+  // This prevents generic keywords from incorrectly winning.
+  const priority: string[] = [
+    "Bills",
+    "Food",
+    "Travel",
+    "Shopping",
+    "Entertainment",
+    "Education",
+    "Health",
+    "Rent",
+    "Subscription",
+    "Personal",
+  ];
+
+  for (const category of priority) {
     const keywords = CATEGORY_RULES[category] || [];
 
-    const matched = keywords.some((keyword) =>
-      text.includes(keyword.toLowerCase()),
-    );
+    const matched = keywords.some((keyword) => {
+      const normalizedKeyword = keyword.toLowerCase().trim();
+
+      if (!normalizedKeyword) {
+        return false;
+      }
+
+      // Multi-word keywords such as "water bill"
+      // can be matched directly.
+      if (normalizedKeyword.includes(" ")) {
+        return text.includes(normalizedKeyword);
+      }
+
+      // Match whole words instead of random substrings.
+      const regex = new RegExp(
+        `(^|\\s|[^a-z0-9])${normalizedKeyword.replace(
+          /[.*+?^${}()|[\]\\]/g,
+          "\\$&",
+        )}($|\\s|[^a-z0-9])`,
+        "i",
+      );
+
+      return regex.test(text);
+    });
 
     if (matched) {
       return category;
@@ -265,7 +314,6 @@ function predictCategory(description: string, merchant: string): string {
 
   return "Other";
 }
-
 /* ============================================================
    NORMALIZE TRANSACTION
 ============================================================ */
