@@ -1,5 +1,7 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import type { ComponentType } from 'react';
+import { useState } from 'react';
+import { SplashScreen } from '@/components/SplashScreen';
 
 import { LandingPage } from '@/pages/Landing';
 import { AppLayout } from '@/layouts/AppLayout';
@@ -18,9 +20,21 @@ import { WhatIfPage } from '@/pages/WhatIf';
 import { LoginPage } from '@/pages/Login';
 
 // Keep the route usable until TransactionsPage's return type is corrected.
-const TransactionsPageComponent = TransactionsPage as unknown as ComponentType;
+const TransactionsPageComponent =
+  TransactionsPage as unknown as ComponentType;
 
 export default function App() {
+  const [showSplash, setShowSplash] = useState(true);
+
+  // Show splash screen when the app starts
+  if (showSplash) {
+    return (
+      <SplashScreen
+        onFinish={() => setShowSplash(false)}
+      />
+    );
+  }
+
   return (
     <BrowserRouter>
       <Routes>
@@ -33,10 +47,11 @@ export default function App() {
           path="/"
           element={<LandingPage />}
         />
+
         <Route
-  path="/login"
-  element={<LoginPage />}
-/>
+          path="/login"
+          element={<LoginPage />}
+        />
 
         {/* =====================================================
             MAIN APP
