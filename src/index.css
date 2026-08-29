@@ -5,17 +5,24 @@
 @tailwind utilities;
 
 /* ============================================================
-   ROOT VARIABLES
+   FINPILOT THEME SYSTEM
+   DARK = DEFAULT
+   LIGHT = OPTIONAL
 ============================================================ */
 
 :root {
-  --obsidian: #050505;
-  --obsidian-2: #080a09;
-  --obsidian-3: #0c0f0d;
+  color-scheme: dark;
+
+  --bg: #050505;
+  --bg-secondary: #080a09;
+  --bg-tertiary: #0c0f0d;
+
   --surface: #111412;
+  --surface-hover: #151a17;
 
   --neon: #00ff88;
   --emerald: #00d97e;
+  --emerald-dark: #00a86b;
 
   --text-primary: #f3f4f6;
   --text-secondary: #d1d5db;
@@ -23,12 +30,14 @@
   --text-faint: #4b5563;
 
   --border-light: rgba(255, 255, 255, 0.06);
-  --border-medium: rgba(255, 255, 255, 0.1);
+  --border-medium: rgba(255, 255, 255, 0.10);
+  --border-strong: rgba(255, 255, 255, 0.16);
 
   --input-bg: rgba(255, 255, 255, 0.03);
 
-  color-scheme: dark;
+  --shadow-card: 0 8px 30px rgba(0, 0, 0, 0.35);
 }
+
 /* ============================================================
    LIGHT THEME
 ============================================================ */
@@ -36,121 +45,29 @@
 html:not(.dark) {
   color-scheme: light;
 
-  --obsidian: #f5f7f6;
-  --obsidian-2: #eef2f0;
-  --obsidian-3: #e7ece9;
+  --bg: #f5f7f6;
+  --bg-secondary: #eef2f0;
+  --bg-tertiary: #e7ece9;
+
   --surface: #ffffff;
+  --surface-hover: #f8faf9;
 
   --neon: #00b86b;
   --emerald: #00a86b;
+  --emerald-dark: #008f5b;
 
   --text-primary: #111827;
   --text-secondary: #374151;
   --text-muted: #6b7280;
   --text-faint: #9ca3af;
 
-  --border-light: rgba(0, 0, 0, 0.08);
-  --border-medium: rgba(0, 0, 0, 0.12);
+  --border-light: rgba(0, 0, 0, 0.07);
+  --border-medium: rgba(0, 0, 0, 0.11);
+  --border-strong: rgba(0, 0, 0, 0.16);
 
-  --input-bg: rgba(0, 0, 0, 0.03);
-}
+  --input-bg: rgba(0, 0, 0, 0.025);
 
-/* ============================================================
-   LIGHT MODE GLOBAL
-============================================================ */
-
-html:not(.dark) body {
-  background: var(--obsidian);
-  color: var(--text-primary);
-}
-
-/* Main cards */
-html:not(.dark) .glass-card,
-html:not(.dark) .glass {
-  background: rgba(255, 255, 255, 0.85);
-  border-color: rgba(0, 0, 0, 0.08);
-  color: #111827;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.04);
-}
-
-html:not(.dark) .glass-card:hover {
-  background: rgba(255, 255, 255, 0.95);
-  border-color: rgba(16, 185, 129, 0.25);
-}
-
-/* Inputs */
-html:not(.dark) .form-input,
-html:not(.dark) .form-textarea,
-html:not(.dark) .form-select {
-  background: #ffffff;
-  color: #111827;
-  border-color: rgba(0, 0, 0, 0.1);
-}
-
-html:not(.dark) .form-input::placeholder,
-html:not(.dark) .form-textarea::placeholder {
-  color: #9ca3af;
-}
-
-html:not(.dark) .form-select option,
-html:not(.dark) select option {
-  background: #ffffff;
-  color: #111827;
-}
-
-/* Scrollbar */
-html:not(.dark) ::-webkit-scrollbar-track {
-  background: #eef2f0;
-}
-
-html:not(.dark) ::-webkit-scrollbar-thumb {
-  background: #cbd5d1;
-}
-
-html:not(.dark) ::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 168, 107, 0.35);
-}
-
-/* Grid background */
-html:not(.dark) .grid-bg {
-  background-image:
-    linear-gradient(
-      rgba(0, 0, 0, 0.035) 1px,
-      transparent 1px
-    ),
-    linear-gradient(
-      90deg,
-      rgba(0, 0, 0, 0.035) 1px,
-      transparent 1px
-    );
-}
-
-/* Secondary buttons */
-html:not(.dark) .btn-secondary {
-  color: #374151;
-  background: rgba(0, 0, 0, 0.035);
-  border-color: rgba(0, 0, 0, 0.08);
-}
-
-html:not(.dark) .btn-secondary:hover {
-  background: rgba(0, 0, 0, 0.06);
-}
-
-/* Date inputs */
-html:not(.dark) input[type='date'] {
-  color-scheme: light;
-}
-
-html:not(.dark)
-  input[type='date']::-webkit-calendar-picker-indicator {
-  filter: none;
-  opacity: 0.65;
-}
-
-/* Selection */
-html:not(.dark) ::selection {
-  background: rgba(0, 168, 107, 0.18);
-  color: #111827;
+  --shadow-card: 0 8px 30px rgba(0, 0, 0, 0.07);
 }
 
 /* ============================================================
@@ -158,13 +75,17 @@ html:not(.dark) ::selection {
 ============================================================ */
 
 * {
+  box-sizing: border-box;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  box-sizing: border-box;
 }
 
 html {
   scroll-behavior: smooth;
+  background: var(--bg);
+  transition:
+    background-color 0.3s ease,
+    color 0.3s ease;
 }
 
 body {
@@ -180,15 +101,15 @@ body {
     'Segoe UI',
     sans-serif;
 
-  background: var(--obsidian);
+  background: var(--bg);
   color: var(--text-primary);
 
   overflow-x: hidden;
-}
 
-/* ============================================================
-   ROOT
-============================================================ */
+  transition:
+    background-color 0.3s ease,
+    color 0.3s ease;
+}
 
 #root {
   min-height: 100vh;
@@ -199,8 +120,8 @@ body {
 ============================================================ */
 
 ::selection {
-  background: rgba(0, 255, 136, 0.2);
-  color: #ffffff;
+  background: rgba(0, 217, 126, 0.22);
+  color: var(--text-primary);
 }
 
 /* ============================================================
@@ -213,20 +134,20 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: #080a09;
+  background: var(--bg-secondary);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #1a1f1c;
-  border-radius: 3px;
+  background: var(--border-strong);
+  border-radius: 999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 217, 126, 0.2);
+  background: rgba(0, 217, 126, 0.35);
 }
 
 /* ============================================================
-   FORM / INPUT GLOBAL
+   FORM ELEMENTS
 ============================================================ */
 
 input,
@@ -236,7 +157,9 @@ button {
   font-family: inherit;
 }
 
-/* Remove default number arrows */
+button {
+  -webkit-tap-highlight-color: transparent;
+}
 
 input[type='number']::-webkit-inner-spin-button,
 input[type='number']::-webkit-outer-spin-button {
@@ -256,125 +179,140 @@ input[type='date'] {
   color-scheme: dark;
 }
 
+html:not(.dark) input[type='date'] {
+  color-scheme: light;
+}
+
 input[type='date']::-webkit-calendar-picker-indicator {
   filter: invert(1);
   opacity: 0.65;
   cursor: pointer;
 }
 
-input[type='date']::-webkit-calendar-picker-indicator:hover {
-  opacity: 1;
+html:not(.dark)
+  input[type='date']::-webkit-calendar-picker-indicator {
+  filter: none;
+  opacity: 0.65;
 }
 
 /* ============================================================
-   SELECT / DROPDOWN
+   SELECT
 ============================================================ */
 
 select {
   color-scheme: dark;
 }
 
-/*
-  Main select class
-*/
-.form-select {
-  @apply w-full px-3.5 py-2.5 rounded-lg text-sm text-gray-200 transition-colors focus:outline-none;
-  
-  background: #111412;
+html:not(.dark) select {
+  color-scheme: light;
+}
 
-  border: 1px solid rgba(255, 255, 255, 0.06);
+.form-select {
+  @apply w-full px-3.5 py-2.5 rounded-lg text-sm transition-colors focus:outline-none;
+
+  background: var(--surface);
+  color: var(--text-primary);
+
+  border: 1px solid var(--border-light);
 }
 
 .form-select:hover {
-  border-color: rgba(255, 255, 255, 0.1);
+  border-color: var(--border-medium);
 }
 
 .form-select:focus {
-  border-color: rgba(52, 211, 153, 0.3);
-  box-shadow: 0 0 0 1px rgba(52, 211, 153, 0.08);
+  border-color: rgba(52, 211, 153, 0.45);
+
+  box-shadow:
+    0 0 0 1px rgba(52, 211, 153, 0.10);
 }
 
-/*
-  Native dropdown options
-*/
-.form-select option {
-  background: #111412;
-  color: #e5e7eb;
-}
-
-.form-select option:checked {
-  background: #123c2c;
-  color: #ffffff;
-}
-
-.form-select option:hover {
-  background: #163f30;
-  color: #ffffff;
-}
-
-/*
-  Fallback for native select elements
-*/
+.form-select option,
 select option {
-  background-color: #111412;
-  color: #e5e7eb;
+  background: var(--surface);
+  color: var(--text-primary);
 }
 
 /* ============================================================
-   TAILWIND COMPONENTS
+   COMPONENTS
 ============================================================ */
 
 @layer components {
 
-  /* ==========================================================
+  /* ----------------------------------------------------------
      GLASS
-  ========================================================== */
+  ---------------------------------------------------------- */
 
   .glass {
-    @apply bg-white/[0.03] backdrop-blur-xl border border-white/[0.06] rounded-2xl;
+    background: rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+
+    border: 1px solid var(--border-light);
+    border-radius: 1rem;
+
+    transition:
+      background-color 0.3s ease,
+      border-color 0.3s ease,
+      box-shadow 0.3s ease;
   }
 
-  /* ==========================================================
+  /* ----------------------------------------------------------
      GLASS CARD
-  ========================================================== */
+  ---------------------------------------------------------- */
 
   .glass-card {
-    @apply bg-white/[0.025] backdrop-blur-xl border border-white/[0.06] rounded-2xl transition-all duration-300;
+    background: rgba(255, 255, 255, 0.025);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+
+    border: 1px solid var(--border-light);
+    border-radius: 1rem;
+
+    box-shadow: var(--shadow-card);
+
+    transition:
+      background-color 0.3s ease,
+      border-color 0.3s ease,
+      box-shadow 0.3s ease,
+      transform 0.3s ease;
   }
 
   .glass-card:hover {
-    @apply border-emerald-400/20 bg-white/[0.04];
+    background: rgba(255, 255, 255, 0.04);
+
+    border-color: rgba(0, 217, 126, 0.20);
 
     box-shadow:
-      0 0 30px rgba(0, 217, 126, 0.05);
+      0 0 30px rgba(0, 217, 126, 0.06);
   }
 
-  /* ==========================================================
+  /* ----------------------------------------------------------
      NEON TEXT
-  ========================================================== */
+  ---------------------------------------------------------- */
 
   .neon-text {
-    color: #00ff88;
+    color: var(--neon);
 
     text-shadow:
-      0 0 20px rgba(0, 255, 136, 0.3);
+      0 0 20px rgba(0, 255, 136, 0.30);
   }
 
-  /* ==========================================================
+  /* ----------------------------------------------------------
      NEON BORDER
-  ========================================================== */
+  ---------------------------------------------------------- */
 
   .neon-border {
     border: 1px solid rgba(0, 255, 136, 0.25);
 
     box-shadow:
-      0 0 20px rgba(0, 255, 136, 0.1),
+      0 0 20px rgba(0, 255, 136, 0.10),
       inset 0 0 20px rgba(0, 255, 136, 0.03);
   }
 
-  /* ==========================================================
+  /* ----------------------------------------------------------
      GRID BACKGROUND
-  ========================================================== */
+  ---------------------------------------------------------- */
 
   .grid-bg {
     background-image:
@@ -391,188 +329,361 @@ select option {
     background-size: 40px 40px;
   }
 
-  /* ==========================================================
+  /* ----------------------------------------------------------
      EMERALD GLOW
-  ========================================================== */
+  ---------------------------------------------------------- */
 
   .glow-emerald {
     box-shadow:
       0 0 40px rgba(0, 217, 126, 0.15);
   }
 
-  /* ==========================================================
+  /* ----------------------------------------------------------
      METRIC LABEL
-  ========================================================== */
+  ---------------------------------------------------------- */
 
   .metric-label {
-    @apply text-[10px] uppercase tracking-[0.15em] text-gray-500 font-medium;
+    @apply text-[10px] uppercase tracking-[0.15em] font-medium;
+
+    color: var(--text-muted);
   }
 
-  /* ==========================================================
+  /* ----------------------------------------------------------
      FORM INPUT
-  ========================================================== */
+  ---------------------------------------------------------- */
 
   .form-input {
-    @apply w-full px-3.5 py-2.5 rounded-lg text-sm text-gray-200 placeholder-gray-600 focus:outline-none transition-colors;
+    @apply w-full px-3.5 py-2.5 rounded-lg text-sm placeholder-gray-600 focus:outline-none transition-colors;
 
-    background: rgba(255, 255, 255, 0.03);
+    background: var(--input-bg);
+    color: var(--text-primary);
 
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--border-light);
   }
 
   .form-input:hover {
-    border-color: rgba(255, 255, 255, 0.1);
+    border-color: var(--border-medium);
   }
 
   .form-input:focus {
-    border-color: rgba(52, 211, 153, 0.3);
+    border-color: rgba(52, 211, 153, 0.40);
 
     box-shadow:
-      0 0 0 1px rgba(52, 211, 153, 0.05);
+      0 0 0 1px rgba(52, 211, 153, 0.08);
   }
 
-  /* ==========================================================
+  .form-input::placeholder {
+    color: var(--text-faint);
+  }
+
+  /* ----------------------------------------------------------
      TEXTAREA
-  ========================================================== */
+  ---------------------------------------------------------- */
 
   .form-textarea {
-    @apply w-full px-3.5 py-3 rounded-lg text-sm text-gray-200 placeholder-gray-600 focus:outline-none transition-colors resize-none;
+    @apply w-full px-3.5 py-3 rounded-lg text-sm placeholder-gray-600 focus:outline-none transition-colors resize-none;
 
-    background: rgba(255, 255, 255, 0.03);
+    background: var(--input-bg);
+    color: var(--text-primary);
 
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--border-light);
   }
 
   .form-textarea:hover {
-    border-color: rgba(255, 255, 255, 0.1);
+    border-color: var(--border-medium);
   }
 
   .form-textarea:focus {
-    border-color: rgba(52, 211, 153, 0.3);
+    border-color: rgba(52, 211, 153, 0.40);
 
     box-shadow:
-      0 0 0 1px rgba(52, 211, 153, 0.05);
+      0 0 0 1px rgba(52, 211, 153, 0.08);
   }
 
-  /* ==========================================================
+  /* ----------------------------------------------------------
      SECTION LABEL
-  ========================================================== */
+  ---------------------------------------------------------- */
 
   .section-label {
-    @apply text-xs uppercase tracking-[0.2em] text-emerald-400/70 font-semibold;
+    @apply text-xs uppercase tracking-[0.2em] font-semibold;
+
+    color: var(--emerald);
   }
 
-  /* ==========================================================
-     BUTTON
-  ========================================================== */
+  /* ----------------------------------------------------------
+     PRIMARY BUTTON
+  ---------------------------------------------------------- */
 
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-400 text-[#050505] text-sm font-semibold transition-all;
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all;
+
+    background: #00d97e;
+    color: #050505;
   }
 
   .btn-primary:hover {
-    @apply bg-emerald-300;
+    background: #00ef8b;
+    transform: translateY(-1px);
   }
 
   .btn-primary:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+    transform: none;
   }
 
-  /* ==========================================================
+  /* ----------------------------------------------------------
      SECONDARY BUTTON
-  ========================================================== */
+  ---------------------------------------------------------- */
 
   .btn-secondary {
-    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-gray-300 text-sm font-semibold transition-all;
-    
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all;
+
+    color: var(--text-secondary);
     background: rgba(255, 255, 255, 0.04);
 
-    border: 1px solid rgba(255, 255, 255, 0.07);
+    border: 1px solid var(--border-light);
   }
 
   .btn-secondary:hover {
-    background: rgba(255, 255, 255, 0.07);
+    background: rgba(255, 255, 255, 0.08);
+    border-color: var(--border-medium);
   }
 
-  /* ==========================================================
+  /* ----------------------------------------------------------
      DANGER BUTTON
-  ========================================================== */
+  ---------------------------------------------------------- */
 
   .btn-danger {
-    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-red-300 text-sm font-semibold transition-all;
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all;
 
+    color: #fca5a5;
     background: rgba(248, 113, 113, 0.05);
 
-    border: 1px solid rgba(248, 113, 113, 0.1);
+    border: 1px solid rgba(248, 113, 113, 0.10);
   }
 
   .btn-danger:hover {
-    background: rgba(248, 113, 113, 0.1);
-    border-color: rgba(248, 113, 113, 0.2);
+    background: rgba(248, 113, 113, 0.10);
+    border-color: rgba(248, 113, 113, 0.20);
   }
 }
 
 /* ============================================================
-   UTILITIES
+   LIGHT MODE COMPONENT OVERRIDES
+============================================================ */
+
+html:not(.dark) {
+
+  /* Main surfaces */
+
+  .glass {
+    background: rgba(255, 255, 255, 0.72);
+    border-color: rgba(0, 0, 0, 0.07);
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.04);
+  }
+
+  .glass-card {
+    background: rgba(255, 255, 255, 0.88);
+    border-color: rgba(0, 0, 0, 0.08);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.05);
+  }
+
+  .glass-card:hover {
+    background: #ffffff;
+    border-color: rgba(16, 185, 129, 0.25);
+    box-shadow: 0 12px 35px rgba(0, 0, 0, 0.07);
+  }
+
+  /* Grid */
+
+  .grid-bg {
+    background-image:
+      linear-gradient(
+        rgba(0, 0, 0, 0.035) 1px,
+        transparent 1px
+      ),
+      linear-gradient(
+        90deg,
+        rgba(0, 0, 0, 0.035) 1px,
+        transparent 1px
+      );
+  }
+
+  /* Inputs */
+
+  .form-input,
+  .form-textarea,
+  .form-select {
+    background: #ffffff;
+    color: #111827;
+    border-color: rgba(0, 0, 0, 0.10);
+  }
+
+  .form-input::placeholder,
+  .form-textarea::placeholder {
+    color: #9ca3af;
+  }
+
+  .form-input:focus,
+  .form-textarea:focus,
+  .form-select:focus {
+    border-color: rgba(16, 185, 129, 0.40);
+  }
+
+  /* Secondary */
+
+  .btn-secondary {
+    color: #374151;
+    background: rgba(0, 0, 0, 0.035);
+    border-color: rgba(0, 0, 0, 0.08);
+  }
+
+  .btn-secondary:hover {
+    background: rgba(0, 0, 0, 0.06);
+  }
+
+  /* Danger */
+
+  .btn-danger {
+    color: #dc2626;
+    background: rgba(239, 68, 68, 0.05);
+    border-color: rgba(239, 68, 68, 0.12);
+  }
+
+  /* ==========================================================
+     TAILWIND UTILITY OVERRIDES
+     Important because existing pages use text-white etc.
+  ========================================================== */
+
+  .text-white {
+    color: #111827 !important;
+  }
+
+  .text-gray-100 {
+    color: #1f2937 !important;
+  }
+
+  .text-gray-200 {
+    color: #374151 !important;
+  }
+
+  .text-gray-300 {
+    color: #4b5563 !important;
+  }
+
+  .text-gray-400 {
+    color: #6b7280 !important;
+  }
+
+  .text-gray-500 {
+    color: #6b7280 !important;
+  }
+
+  .text-gray-600 {
+    color: #6b7280 !important;
+  }
+
+  .text-gray-700 {
+    color: #4b5563 !important;
+  }
+
+  .border-white\/5 {
+    border-color: rgba(0, 0, 0, 0.05) !important;
+  }
+
+  .border-white\/10 {
+    border-color: rgba(0, 0, 0, 0.10) !important;
+  }
+
+  .border-white\/20 {
+    border-color: rgba(0, 0, 0, 0.15) !important;
+  }
+
+  .bg-white\/5 {
+    background-color: rgba(0, 0, 0, 0.035) !important;
+  }
+
+  .bg-white\/10 {
+    background-color: rgba(0, 0, 0, 0.06) !important;
+  }
+
+  .bg-white\/\[0\.03\] {
+    background-color: rgba(0, 0, 0, 0.025) !important;
+  }
+
+  .bg-white\/\[0\.04\] {
+    background-color: rgba(0, 0, 0, 0.04) !important;
+  }
+
+  /* Common dark backgrounds */
+
+  .bg-\[\#050505\] {
+    background-color: #f5f7f6 !important;
+  }
+
+  .bg-\[\#020504\] {
+    background-color: #f5f7f6 !important;
+  }
+
+  /* Text with dark hardcoded color */
+
+  .text-\[\#050505\] {
+    color: #ffffff !important;
+  }
+
+  /* Shadows */
+
+  .shadow-\[0_0_60px_rgba\(16\,185\,129\,0\.35\)\] {
+    box-shadow:
+      0 0 60px rgba(16, 185, 129, 0.20) !important;
+  }
+}
+
+/* ============================================================
+   THEME TRANSITION
+============================================================ */
+
+html.theme-transition,
+html.theme-transition body,
+html.theme-transition #root,
+html.theme-transition * {
+  transition:
+    background-color 0.3s ease,
+    color 0.3s ease,
+    border-color 0.3s ease,
+    box-shadow 0.3s ease !important;
+}
+
+/* ============================================================
+   ANIMATIONS
 ============================================================ */
 
 @layer utilities {
 
-  /* ==========================================================
-     FADE UP
-  ========================================================== */
-
   .animate-fade-up {
-    animation:
-      fadeUp 0.6s ease-out forwards;
+    animation: fadeUp 0.6s ease-out forwards;
   }
-
-  /* ==========================================================
-     FADE IN
-  ========================================================== */
 
   .animate-fade-in {
-    animation:
-      fadeIn 0.4s ease-out forwards;
+    animation: fadeIn 0.4s ease-out forwards;
   }
-
-  /* ==========================================================
-     PULSE GLOW
-  ========================================================== */
 
   .animate-pulse-glow {
-    animation:
-      pulseGlow 2s ease-in-out infinite;
+    animation: pulseGlow 2s ease-in-out infinite;
   }
-
-  /* ==========================================================
-     SCAN
-  ========================================================== */
 
   .animate-scan {
-    animation:
-      scan 3s ease-in-out infinite;
+    animation: scan 3s ease-in-out infinite;
   }
-
-  /* ==========================================================
-     COUNT
-  ========================================================== */
 
   .animate-count {
-    animation:
-      countUp 1s ease-out forwards;
+    animation: countUp 1s ease-out forwards;
   }
-
-  /* ==========================================================
-     REVEAL
-  ========================================================== */
 
   .reveal {
     opacity: 0;
-
-    transform:
-      translateY(20px);
+    transform: translateY(20px);
 
     transition:
       opacity 0.6s ease-out,
@@ -581,14 +692,8 @@ select option {
 
   .reveal.visible {
     opacity: 1;
-
-    transform:
-      translateY(0);
+    transform: translateY(0);
   }
-
-  /* ==========================================================
-     TEXT BALANCE
-  ========================================================== */
 
   .text-balance {
     text-wrap: balance;
@@ -600,23 +705,18 @@ select option {
 ============================================================ */
 
 @keyframes fadeUp {
-
   from {
     opacity: 0;
-    transform:
-      translateY(16px);
+    transform: translateY(16px);
   }
 
   to {
     opacity: 1;
-    transform:
-      translateY(0);
+    transform: translateY(0);
   }
-
 }
 
 @keyframes fadeIn {
-
   from {
     opacity: 0;
   }
@@ -624,11 +724,9 @@ select option {
   to {
     opacity: 1;
   }
-
 }
 
 @keyframes pulseGlow {
-
   0%,
   100% {
     opacity: 1;
@@ -643,79 +741,58 @@ select option {
     box-shadow:
       0 0 16px rgba(0, 255, 136, 0.6);
   }
-
 }
 
 @keyframes scan {
-
   0%,
   100% {
-    transform:
-      translateY(0);
-
+    transform: translateY(0);
     opacity: 0.3;
   }
 
   50% {
-    transform:
-      translateY(100%);
-
+    transform: translateY(100%);
     opacity: 0.8;
   }
-
 }
 
 @keyframes countUp {
-
   from {
     opacity: 0;
-
-    transform:
-      scale(0.95);
+    transform: scale(0.95);
   }
 
   to {
     opacity: 1;
-
-    transform:
-      scale(1);
+    transform: scale(1);
   }
-
 }
 
 @keyframes gradientShift {
-
   0% {
-    background-position:
-      0% 50%;
+    background-position: 0% 50%;
   }
 
   50% {
-    background-position:
-      100% 50%;
+    background-position: 100% 50%;
   }
 
   100% {
-    background-position:
-      0% 50%;
+    background-position: 0% 50%;
   }
-
 }
 
 /* ============================================================
-   GRADIENT UTILITY
+   GRADIENT
 ============================================================ */
 
 .animate-gradient {
-  background-size:
-    200% 200%;
-
-  animation:
-    gradientShift 4s ease infinite;
+  background-size: 200% 200%;
+  animation: gradientShift 4s ease infinite;
 }
 
 /* ============================================================
-   FOCUS ACCESSIBILITY
+   ACCESSIBILITY
 ============================================================ */
 
 button:focus-visible,
@@ -723,15 +800,9 @@ a:focus-visible,
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
-  outline:
-    2px solid rgba(52, 211, 153, 0.45);
-
+  outline: 2px solid rgba(52, 211, 153, 0.45);
   outline-offset: 2px;
 }
-
-/* ============================================================
-   DISABLED STATE
-============================================================ */
 
 button:disabled,
 input:disabled,
@@ -745,7 +816,6 @@ textarea:disabled {
 ============================================================ */
 
 @media (max-width: 640px) {
-
   .glass,
   .glass-card {
     border-radius: 1rem;
@@ -754,5 +824,19 @@ textarea:disabled {
   .metric-label {
     letter-spacing: 0.12em;
   }
+}
 
-}         
+/* ============================================================
+   REDUCED MOTION
+============================================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}

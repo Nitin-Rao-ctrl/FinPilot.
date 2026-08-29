@@ -1,7 +1,9 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import type { ComponentType } from 'react';
 import { useState } from 'react';
+
 import { SplashScreen } from '@/components/SplashScreen';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 import { LandingPage } from '@/pages/Landing';
 import { AppLayout } from '@/layouts/AppLayout';
@@ -26,7 +28,12 @@ const TransactionsPageComponent =
 export default function App() {
   const [showSplash, setShowSplash] = useState(true);
 
-  // Show splash screen when the app starts
+  /*
+   * ============================================================
+   * SPLASH SCREEN
+   * ============================================================
+   */
+
   if (showSplash) {
     return (
       <SplashScreen
@@ -35,91 +42,143 @@ export default function App() {
     );
   }
 
+  /*
+   * ============================================================
+   * MAIN APPLICATION
+   * ============================================================
+   */
+
   return (
     <BrowserRouter>
+      {/* ========================================================
+          GLOBAL THEME TOGGLE
+
+          Dark mode is the default.
+          User can switch to light mode from anywhere.
+      ======================================================== */}
+
+      <ThemeToggle />
+
       <Routes>
 
-        {/* =====================================================
+        {/* ======================================================
             LANDING PAGE
-        ===================================================== */}
+        ====================================================== */}
 
         <Route
           path="/"
           element={<LandingPage />}
         />
 
+        {/* ======================================================
+            LOGIN
+        ====================================================== */}
+
         <Route
           path="/login"
           element={<LoginPage />}
         />
 
-        {/* =====================================================
-            MAIN APP
-        ===================================================== */}
+        {/* ======================================================
+            MAIN APP LAYOUT
+        ====================================================== */}
 
         <Route element={<AppLayout />}>
 
-          {/* Dashboard */}
+          {/* ====================================================
+              DASHBOARD
+          ==================================================== */}
+
           <Route
             path="/dashboard"
             element={<DashboardPage />}
           />
 
-          {/* What-If Simulator */}
+          {/* ====================================================
+              WHAT-IF SIMULATOR
+          ==================================================== */}
+
           <Route
             path="/what-if"
             element={<WhatIfPage />}
           />
 
-          {/* Transactions */}
+          {/* ====================================================
+              TRANSACTIONS
+          ==================================================== */}
+
           <Route
             path="/transactions"
             element={<TransactionsPageComponent />}
           />
 
-          {/* Insights */}
+          {/* ====================================================
+              INSIGHTS
+          ==================================================== */}
+
           <Route
             path="/insights"
             element={<InsightsPage />}
           />
 
-          {/* Budget */}
+          {/* ====================================================
+              BUDGET
+          ==================================================== */}
+
           <Route
             path="/budget"
             element={<BudgetPage />}
           />
 
-          {/* Goals */}
+          {/* ====================================================
+              GOALS
+          ==================================================== */}
+
           <Route
             path="/goals"
             element={<GoalsPage />}
           />
 
-          {/* Weekly Report */}
+          {/* ====================================================
+              WEEKLY REPORT
+          ==================================================== */}
+
           <Route
             path="/weekly-report"
             element={<WeeklyReportPage />}
           />
 
-          {/* Should I Spend */}
+          {/* ====================================================
+              SHOULD I SPEND?
+          ==================================================== */}
+
           <Route
             path="/ask"
             element={<AskPage />}
           />
 
-          {/* Loans */}
+          {/* ====================================================
+              LOANS
+          ==================================================== */}
+
           <Route
             path="/loans"
             element={<LoansPage />}
           />
 
-          {/* Profile */}
+          {/* ====================================================
+              PROFILE
+          ==================================================== */}
+
           <Route
             path="/profile"
             element={<ProfilePage />}
           />
 
-          {/* Settings */}
+          {/* ====================================================
+              SETTINGS
+          ==================================================== */}
+
           <Route
             path="/settings"
             element={<SettingsPage />}

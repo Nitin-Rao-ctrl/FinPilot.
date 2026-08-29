@@ -2,17 +2,86 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0"
+    />
+
+    <!-- =====================================================
+         FINPILOT THEME INITIALIZER
+         DARK MODE = DEFAULT
+         ===================================================== -->
+    <script>
+      (function () {
+        const theme = localStorage.getItem('finpilot_theme');
+
+        if (theme === 'light') {
+          document.documentElement.classList.add('light');
+          document.documentElement.classList.remove('dark');
+        } else {
+          // Dark mode is the default
+          document.documentElement.classList.add('dark');
+          document.documentElement.classList.remove('light');
+        }
+      })();
+    </script>
+
+    <!-- =====================================================
+         FINPILOT FAVICON
+         ===================================================== -->
+    <link
+      rel="icon"
+      type="image/png"
+      href="/finpilot-logo.png"
+    />
+
     <title>FinPilot — Financial Intelligence</title>
-    <link rel="icon" type="image/png" href="/finpilot-logo.png" />
-    <meta property="og:image" content="https://bolt.new/static/og_default.png" />
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:image" content="https://bolt.new/static/og_default.png" />
+
+    <!-- Open Graph -->
+    <meta
+      property="og:title"
+      content="FinPilot — Financial Intelligence"
+    />
+
+    <meta
+      property="og:description"
+      content="Understand your money. Make better financial decisions."
+    />
+
+    <meta
+      property="og:image"
+      content="https://bolt.new/static/og_default.png"
+    />
+
+    <!-- Twitter -->
+    <meta
+      name="twitter:card"
+      content="summary_large_image"
+    />
+
+    <meta
+      name="twitter:title"
+      content="FinPilot — Financial Intelligence"
+    />
+
+    <meta
+      name="twitter:description"
+      content="Understand your money. Make better financial decisions."
+    />
+
+    <meta
+      name="twitter:image"
+      content="https://bolt.new/static/og_default.png"
+    />
   </head>
+
   <body>
     <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
+
+    <script
+      type="module"
+      src="/src/main.tsx"
+    ></script>
   </body>
 </html>
