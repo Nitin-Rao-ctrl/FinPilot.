@@ -4,7 +4,7 @@ import {
   useLocation,
 } from 'react-router-dom';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import {
   LayoutDashboard,
@@ -20,6 +20,8 @@ import {
   Menu,
   X,
   LogOut,
+  Sun,
+  Moon,
 } from 'lucide-react';
 
 const navItems = [
@@ -64,39 +66,102 @@ const navItems = [
     icon: HandCoins,
   },
   {
-  to: '/what-if',
-  label: 'What-If Simulator',
-  icon: Lightbulb,
-},
+    to: '/what-if',
+    label: 'What-If Simulator',
+    icon: Lightbulb,
+  },
 ];
 
+/* ============================================================
+   THEME BUTTON
+   IMPORTANT:
+   This button is NOT fixed or absolute.
+   It stays inside the header and can never cover the menu.
+============================================================ */
+
+function ThemeButton() {
+  const [isLight, setIsLight] = useState(() => {
+    if (typeof window === 'undefined') return false;
+
+    return localStorage.getItem('finpilot_theme') === 'light';
+  });
+
+  useEffect(() => {
+    const root = document.documentElement;
+
+    if (isLight) {
+      root.classList.remove('dark');
+      localStorage.setItem('finpilot_theme', 'light');
+    } else {
+      root.classList.add('dark');
+      localStorage.setItem('finpilot_theme', 'dark');
+    }
+  }, [isLight]);
+
+  const toggleTheme = () => {
+    setIsLight((prev) => !prev);
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={toggleTheme}
+      aria-label={isLight ? 'Switch to dark mode' : 'Switch to light mode'}
+      title={isLight ? 'Dark mode' : 'Light mode'}
+      className="
+        flex
+        items-center
+        justify-center
+        w-10
+        h-10
+        rounded-xl
+        border
+        border-emerald-400/20
+        bg-emerald-400/[0.06]
+        text-emerald-400
+        hover:bg-emerald-400/[0.12]
+        hover:border-emerald-400/30
+        active:scale-95
+        transition-all
+        touch-manipulation
+        shrink-0
+      "
+    >
+      {isLight ? (
+        <Moon
+          className="w-5 h-5"
+          strokeWidth={2.2}
+        />
+      ) : (
+        <Sun
+          className="w-5 h-5"
+          strokeWidth={2.2}
+        />
+      )}
+    </button>
+  );
+}
+
+/* ============================================================
+   APP LAYOUT
+============================================================ */
+
 export function AppLayout() {
-  const [mobileOpen, setMobileOpen] =
-    useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   const location = useLocation();
 
-  /*
-   * ============================================================
-   * LOGOUT
-   * ============================================================
-   *
-   * IMPORTANT:
-   * We do NOT clear localStorage here because your app
-   * stores budget/goals/etc. there.
-   *
-   * Logout simply returns the user to the landing page.
-   */
+  /* ============================================================
+     LOGOUT
+  ============================================================ */
 
   const handleLogout = () => {
     window.location.href = '/';
   };
 
-  /*
-   * ============================================================
-   * CLOSE MOBILE MENU
-   * ============================================================
-   */
+  /* ============================================================
+     CLOSE MOBILE MENU
+  ============================================================ */
 
   const closeMobileMenu = () => {
     setMobileOpen(false);
@@ -109,35 +174,54 @@ export function AppLayout() {
           AMBIENT BACKGROUND
       ====================================================== */}
 
-      <div className="fixed inset-0 pointer-events-none">
-
+      <div className="fixed inset-0 pointer-events-none z-0">
         <div className="absolute top-[10%] left-[5%] w-[400px] h-[400px] bg-emerald-500/[0.05] rounded-full blur-[100px]" />
 
         <div className="absolute bottom-[20%] right-[5%] w-[300px] h-[300px] bg-emerald-600/[0.03] rounded-full blur-[80px]" />
-
       </div>
 
       {/* ======================================================
           DESKTOP SIDEBAR
       ====================================================== */}
 
-      <aside className="hidden md:flex flex-col w-60 bg-[#080A09]/80 backdrop-blur-xl border-r border-white/[0.04] fixed h-screen z-40">
+      <aside className="
+        hidden
+        md:flex
+        flex-col
+        w-60
+        bg-[#080A09]/80
+        backdrop-blur-xl
+        border-r
+        border-white/[0.04]
+        fixed
+        h-screen
+        z-40
+      ">
 
         {/* ====================================================
-            LOGO
+            DESKTOP LOGO
         ==================================================== */}
 
         <div className="p-5 border-b border-white/[0.04]">
 
           <div className="flex items-center gap-2.5">
 
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center glow-emerald">
-
+            <div className="
+              w-8
+              h-8
+              rounded-lg
+              bg-gradient-to-br
+              from-emerald-400
+              to-emerald-600
+              flex
+              items-center
+              justify-center
+              glow-emerald
+            ">
               <Wallet
                 className="w-4 h-4 text-[#050505]"
                 strokeWidth={2.5}
               />
-
             </div>
 
             <span className="text-white font-bold tracking-tight text-sm">
@@ -176,16 +260,27 @@ export function AppLayout() {
 
               </NavLink>
             );
-
           })}
 
         </nav>
 
         {/* ====================================================
-            BOTTOM NAVIGATION
+            DESKTOP BOTTOM NAVIGATION
         ==================================================== */}
 
         <div className="p-3 border-t border-white/[0.04] space-y-0.5">
+
+          {/* DESKTOP THEME */}
+
+          <div className="flex items-center justify-between px-2 py-2 mb-1">
+
+            <span className="text-xs text-gray-500">
+              Theme
+            </span>
+
+            <ThemeButton />
+
+          </div>
 
           {/* PROFILE */}
 
@@ -226,7 +321,23 @@ export function AppLayout() {
           <button
             type="button"
             onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-500 hover:text-red-400 hover:bg-red-400/[0.05] border border-transparent transition-all"
+            className="
+              w-full
+              flex
+              items-center
+              gap-3
+              px-3
+              py-2.5
+              rounded-lg
+              text-sm
+              font-medium
+              text-gray-500
+              hover:text-red-400
+              hover:bg-red-400/[0.05]
+              border
+              border-transparent
+              transition-all
+            "
           >
 
             <LogOut className="w-4 h-4" />
@@ -243,48 +354,141 @@ export function AppLayout() {
           MOBILE HEADER
       ====================================================== */}
 
-      <div className="md:hidden fixed top-0 left-0 right-0 bg-[#080A09]/80 backdrop-blur-xl border-b border-white/[0.04] z-40">
+      <header className="
+        md:hidden
+        fixed
+        top-0
+        left-0
+        right-0
+        bg-[#080A09]/95
+        backdrop-blur-xl
+        border-b
+        border-white/[0.04]
+        z-50
+      ">
 
-        {/* HEADER BAR */}
+        {/* ==================================================
+            MOBILE HEADER BAR
 
-        <div className="flex items-center justify-between px-4 h-14">
+            IMPORTANT:
+            Theme + Menu are normal flex children.
+            Nothing is fixed/absolute here.
+        ================================================== */}
 
-          {/* MOBILE LOGO */}
+        <div className="
+          flex
+          items-center
+          justify-between
+          px-3
+          h-14
+          w-full
+        ">
 
-          <div className="flex items-center gap-2">
+          {/* ==================================================
+              MOBILE LOGO
+          ================================================== */}
 
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center">
+          <div className="
+            flex
+            items-center
+            gap-2
+            min-w-0
+            flex-1
+          ">
+
+            <div className="
+              w-8
+              h-8
+              rounded-lg
+              bg-gradient-to-br
+              from-emerald-400
+              to-emerald-600
+              flex
+              items-center
+              justify-center
+              shrink-0
+            ">
 
               <Wallet
-                className="w-3.5 h-3.5 text-[#050505]"
+                className="w-4 h-4 text-[#050505]"
                 strokeWidth={2.5}
               />
 
             </div>
 
-            <span className="text-white font-bold tracking-tight text-sm">
+            <span className="
+              text-white
+              font-bold
+              tracking-tight
+              text-sm
+              truncate
+            ">
               FINPILOT
             </span>
 
           </div>
 
-          {/* MENU BUTTON */}
+          {/* ==================================================
+              MOBILE ACTIONS
 
-          <button
-            type="button"
-            onClick={() =>
-              setMobileOpen((prev) => !prev)
-            }
-            className="p-2 text-gray-400 hover:text-white"
-          >
+              Theme and Menu have separate 40x40 areas.
+              They can NEVER overlap.
+          ================================================== */}
 
-            {mobileOpen ? (
-              <X className="w-5 h-5" />
-            ) : (
-              <Menu className="w-5 h-5" />
-            )}
+          <div className="
+            flex
+            items-center
+            gap-2
+            shrink-0
+            ml-3
+          ">
 
-          </button>
+            {/* THEME */}
+
+            <ThemeButton />
+
+            {/* MENU */}
+
+            <button
+              type="button"
+              aria-label={
+                mobileOpen
+                  ? 'Close navigation menu'
+                  : 'Open navigation menu'
+              }
+              aria-expanded={mobileOpen}
+              onClick={() =>
+                setMobileOpen((prev) => !prev)
+              }
+              className="
+                flex
+                items-center
+                justify-center
+                w-10
+                h-10
+                rounded-xl
+                border
+                border-white/[0.06]
+                text-gray-400
+                hover:text-white
+                hover:bg-white/[0.06]
+                active:bg-white/[0.1]
+                active:scale-95
+                transition-all
+                touch-manipulation
+                shrink-0
+              "
+            >
+
+              {mobileOpen ? (
+                <X className="w-5 h-5" />
+              ) : (
+                <Menu className="w-5 h-5" />
+              )}
+
+            </button>
+
+          </div>
 
         </div>
 
@@ -294,7 +498,16 @@ export function AppLayout() {
 
         {mobileOpen && (
 
-          <nav className="p-3 border-t border-white/[0.04] space-y-0.5">
+          <nav className="
+            p-3
+            border-t
+            border-white/[0.04]
+            space-y-0.5
+            bg-[#080A09]/95
+            backdrop-blur-xl
+            max-h-[calc(100vh-56px)]
+            overflow-y-auto
+          ">
 
             {/* MAIN NAV */}
 
@@ -305,7 +518,7 @@ export function AppLayout() {
                 to={item.to}
                 onClick={closeMobileMenu}
                 className={({ isActive }) =>
-                  `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                  `flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium transition-all ${
                     isActive
                       ? 'bg-emerald-400/10 text-emerald-400'
                       : 'text-gray-500 hover:text-gray-200 hover:bg-white/[0.03]'
@@ -327,7 +540,7 @@ export function AppLayout() {
               to="/profile"
               onClick={closeMobileMenu}
               className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                `flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium transition-all ${
                   isActive
                     ? 'bg-emerald-400/10 text-emerald-400'
                     : 'text-gray-500 hover:text-gray-200 hover:bg-white/[0.03]'
@@ -347,7 +560,7 @@ export function AppLayout() {
               to="/settings"
               onClick={closeMobileMenu}
               className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                `flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium transition-all ${
                   isActive
                     ? 'bg-emerald-400/10 text-emerald-400'
                     : 'text-gray-500 hover:text-gray-200 hover:bg-white/[0.03]'
@@ -369,7 +582,21 @@ export function AppLayout() {
                 closeMobileMenu();
                 handleLogout();
               }}
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-500 hover:text-red-400 hover:bg-red-400/[0.05] transition-all"
+              className="
+                w-full
+                flex
+                items-center
+                gap-3
+                px-3
+                py-3
+                rounded-lg
+                text-sm
+                font-medium
+                text-gray-500
+                hover:text-red-400
+                hover:bg-red-400/[0.05]
+                transition-all
+              "
             >
 
               <LogOut className="w-4 h-4" />
@@ -382,15 +609,27 @@ export function AppLayout() {
 
         )}
 
-      </div>
+      </header>
 
       {/* ======================================================
           MAIN CONTENT
       ====================================================== */}
 
-      <main className="flex-1 md:ml-60 pt-14 md:pt-0 relative">
+      <main className="
+        flex-1
+        md:ml-60
+        pt-14
+        md:pt-0
+        relative
+        z-10
+      ">
 
-        <div className="max-w-6xl mx-auto p-4 md:p-8">
+        <div className="
+          max-w-6xl
+          mx-auto
+          p-4
+          md:p-8
+        ">
 
           <Outlet />
 
