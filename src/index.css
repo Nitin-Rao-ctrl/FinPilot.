@@ -29,6 +29,129 @@
 
   color-scheme: dark;
 }
+/* ============================================================
+   LIGHT THEME
+============================================================ */
+
+html:not(.dark) {
+  color-scheme: light;
+
+  --obsidian: #f5f7f6;
+  --obsidian-2: #eef2f0;
+  --obsidian-3: #e7ece9;
+  --surface: #ffffff;
+
+  --neon: #00b86b;
+  --emerald: #00a86b;
+
+  --text-primary: #111827;
+  --text-secondary: #374151;
+  --text-muted: #6b7280;
+  --text-faint: #9ca3af;
+
+  --border-light: rgba(0, 0, 0, 0.08);
+  --border-medium: rgba(0, 0, 0, 0.12);
+
+  --input-bg: rgba(0, 0, 0, 0.03);
+}
+
+/* ============================================================
+   LIGHT MODE GLOBAL
+============================================================ */
+
+html:not(.dark) body {
+  background: var(--obsidian);
+  color: var(--text-primary);
+}
+
+/* Main cards */
+html:not(.dark) .glass-card,
+html:not(.dark) .glass {
+  background: rgba(255, 255, 255, 0.85);
+  border-color: rgba(0, 0, 0, 0.08);
+  color: #111827;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.04);
+}
+
+html:not(.dark) .glass-card:hover {
+  background: rgba(255, 255, 255, 0.95);
+  border-color: rgba(16, 185, 129, 0.25);
+}
+
+/* Inputs */
+html:not(.dark) .form-input,
+html:not(.dark) .form-textarea,
+html:not(.dark) .form-select {
+  background: #ffffff;
+  color: #111827;
+  border-color: rgba(0, 0, 0, 0.1);
+}
+
+html:not(.dark) .form-input::placeholder,
+html:not(.dark) .form-textarea::placeholder {
+  color: #9ca3af;
+}
+
+html:not(.dark) .form-select option,
+html:not(.dark) select option {
+  background: #ffffff;
+  color: #111827;
+}
+
+/* Scrollbar */
+html:not(.dark) ::-webkit-scrollbar-track {
+  background: #eef2f0;
+}
+
+html:not(.dark) ::-webkit-scrollbar-thumb {
+  background: #cbd5d1;
+}
+
+html:not(.dark) ::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 168, 107, 0.35);
+}
+
+/* Grid background */
+html:not(.dark) .grid-bg {
+  background-image:
+    linear-gradient(
+      rgba(0, 0, 0, 0.035) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      90deg,
+      rgba(0, 0, 0, 0.035) 1px,
+      transparent 1px
+    );
+}
+
+/* Secondary buttons */
+html:not(.dark) .btn-secondary {
+  color: #374151;
+  background: rgba(0, 0, 0, 0.035);
+  border-color: rgba(0, 0, 0, 0.08);
+}
+
+html:not(.dark) .btn-secondary:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+/* Date inputs */
+html:not(.dark) input[type='date'] {
+  color-scheme: light;
+}
+
+html:not(.dark)
+  input[type='date']::-webkit-calendar-picker-indicator {
+  filter: none;
+  opacity: 0.65;
+}
+
+/* Selection */
+html:not(.dark) ::selection {
+  background: rgba(0, 168, 107, 0.18);
+  color: #111827;
+}
 
 /* ============================================================
    GLOBAL
