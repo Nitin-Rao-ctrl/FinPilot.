@@ -24,6 +24,10 @@ import {
   Moon,
 } from 'lucide-react';
 
+/* ============================================================
+   NAVIGATION
+============================================================ */
+
 const navItems = [
   {
     to: '/dashboard',
@@ -74,14 +78,23 @@ const navItems = [
 
 /* ============================================================
    THEME BUTTON
-   IMPORTANT:
-   This button is NOT fixed or absolute.
-   It stays inside the header and can never cover the menu.
+
+   Dark mode = DEFAULT
+
+   Button:
+   - Dark mode -> Sun icon
+   - Light mode -> Moon icon
+
+   One button is rendered in the desktop sidebar and one
+   in the mobile header. They are not fixed/absolute, so
+   they cannot overlap the mobile menu button.
 ============================================================ */
 
 function ThemeButton() {
   const [isLight, setIsLight] = useState(() => {
-    if (typeof window === 'undefined') return false;
+    if (typeof window === 'undefined') {
+      return false;
+    }
 
     return localStorage.getItem('finpilot_theme') === 'light';
   });
@@ -106,8 +119,16 @@ function ThemeButton() {
     <button
       type="button"
       onClick={toggleTheme}
-      aria-label={isLight ? 'Switch to dark mode' : 'Switch to light mode'}
-      title={isLight ? 'Dark mode' : 'Light mode'}
+      aria-label={
+        isLight
+          ? 'Switch to dark mode'
+          : 'Switch to light mode'
+      }
+      title={
+        isLight
+          ? 'Dark mode'
+          : 'Light mode'
+      }
       className="
         flex
         items-center
@@ -117,9 +138,9 @@ function ThemeButton() {
         rounded-xl
         border
         border-emerald-400/20
-        bg-emerald-400/[0.06]
+        bg-emerald-400/10
         text-emerald-400
-        hover:bg-emerald-400/[0.12]
+        hover:bg-emerald-400/20
         hover:border-emerald-400/30
         active:scale-95
         transition-all
@@ -168,152 +189,253 @@ export function AppLayout() {
   };
 
   return (
-    <div className="min-h-screen bg-[#050505] text-gray-200 grid-bg flex">
+    <div
+      className="
+        min-h-screen
+        bg-[#050505]
+        text-gray-200
+        grid-bg
+        flex
+      "
+    >
 
       {/* ======================================================
           AMBIENT BACKGROUND
       ====================================================== */}
 
-      <div className="fixed inset-0 pointer-events-none z-0">
-        <div className="absolute top-[10%] left-[5%] w-[400px] h-[400px] bg-emerald-500/[0.05] rounded-full blur-[100px]" />
+      <div
+        className="
+          fixed
+          inset-0
+          pointer-events-none
+          z-0
+          overflow-hidden
+        "
+      >
+        <div
+          className="
+            absolute
+            top-10
+            left-5
+            w-[400px]
+            h-[400px]
+            bg-emerald-500
+            rounded-full
+            blur-[100px]
+            opacity-[0.05]
+          "
+        />
 
-        <div className="absolute bottom-[20%] right-[5%] w-[300px] h-[300px] bg-emerald-600/[0.03] rounded-full blur-[80px]" />
+        <div
+          className="
+            absolute
+            bottom-20
+            right-10
+            w-64
+            h-64
+            rounded-full
+            bg-emerald-600
+            blur-3xl
+            opacity-5
+          "
+        />
       </div>
 
       {/* ======================================================
           DESKTOP SIDEBAR
       ====================================================== */}
 
-      <aside className="
-        hidden
-        md:flex
-        flex-col
-        w-60
-        bg-[#080A09]/80
-        backdrop-blur-xl
-        border-r
-        border-white/[0.04]
-        fixed
-        h-screen
-        z-40
-      ">
+      <aside
+        className="
+          hidden
+          md:flex
+          flex-col
+          w-60
+          bg-[#080A09]
+          border-r
+          border-white/[0.04]
+          fixed
+          left-0
+          top-0
+          h-screen
+          z-40
+        "
+      >
 
-        {/* ====================================================
-            DESKTOP LOGO
-        ==================================================== */}
+        {/* DESKTOP LOGO */}
 
-        <div className="p-5 border-b border-white/[0.04]">
-
-          <div className="flex items-center gap-2.5">
-
-            <div className="
-              w-8
-              h-8
-              rounded-lg
-              bg-gradient-to-br
-              from-emerald-400
-              to-emerald-600
+        <div
+          className="
+            p-5
+            border-b
+            border-white/[0.04]
+          "
+        >
+          <div
+            className="
               flex
               items-center
-              justify-center
-              glow-emerald
-            ">
+              gap-2.5
+            "
+          >
+            <div
+              className="
+                w-8
+                h-8
+                rounded-lg
+                bg-gradient-to-br
+                from-emerald-400
+                to-emerald-600
+                flex
+                items-center
+                justify-center
+              "
+            >
               <Wallet
                 className="w-4 h-4 text-[#050505]"
                 strokeWidth={2.5}
               />
             </div>
 
-            <span className="text-white font-bold tracking-tight text-sm">
+            <span
+              className="
+                text-white
+                font-bold
+                tracking-tight
+                text-sm
+              "
+            >
               FINPILOT
             </span>
-
           </div>
-
         </div>
 
-        {/* ====================================================
-            MAIN NAVIGATION
-        ==================================================== */}
+        {/* MAIN NAVIGATION */}
 
-        <nav className="flex-1 overflow-y-auto p-3 space-y-0.5">
-
+        <nav
+          className="
+            flex-1
+            overflow-y-auto
+            p-3
+            space-y-0.5
+          "
+        >
           {navItems.map((item) => {
-
             const isActive =
               location.pathname === item.to;
+
+            const Icon = item.icon;
 
             return (
               <NavLink
                 key={item.to}
                 to={item.to}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                  isActive
-                    ? 'bg-emerald-400/10 text-emerald-400 border border-emerald-400/15'
-                    : 'text-gray-500 hover:text-gray-200 hover:bg-white/[0.03] border border-transparent'
-                }`}
+                className={`
+                  flex
+                  items-center
+                  gap-3
+                  px-3
+                  py-2.5
+                  rounded-lg
+                  text-sm
+                  font-medium
+                  transition-all
+                  ${
+                    isActive
+                      ? 'bg-emerald-400/10 text-emerald-400 border border-emerald-400/15'
+                      : 'text-gray-500 hover:text-gray-200 hover:bg-white/[0.03] border border-transparent'
+                  }
+                `}
               >
-
-                <item.icon className="w-4 h-4" />
-
+                <Icon className="w-4 h-4" />
                 {item.label}
-
               </NavLink>
             );
           })}
-
         </nav>
 
-        {/* ====================================================
-            DESKTOP BOTTOM NAVIGATION
-        ==================================================== */}
+        {/* DESKTOP BOTTOM */}
 
-        <div className="p-3 border-t border-white/[0.04] space-y-0.5">
+        <div
+          className="
+            p-3
+            border-t
+            border-white/[0.04]
+            space-y-1
+          "
+        >
 
-          {/* DESKTOP THEME */}
+          {/* THEME */}
 
-          <div className="flex items-center justify-between px-2 py-2 mb-1">
-
-            <span className="text-xs text-gray-500">
+          <div
+            className="
+              flex
+              items-center
+              justify-between
+              px-2
+              py-2
+            "
+          >
+            <span
+              className="
+                text-xs
+                text-gray-500
+              "
+            >
               Theme
             </span>
 
             <ThemeButton />
-
           </div>
 
           {/* PROFILE */}
 
           <NavLink
             to="/profile"
-            className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
-              location.pathname === '/profile'
-                ? 'bg-emerald-400/10 text-emerald-400 border border-emerald-400/15'
-                : 'text-gray-500 hover:text-gray-200 hover:bg-white/[0.03] border border-transparent'
-            }`}
+            className={`
+              flex
+              items-center
+              gap-3
+              px-3
+              py-2.5
+              rounded-lg
+              text-sm
+              font-medium
+              transition-all
+              ${
+                location.pathname === '/profile'
+                  ? 'bg-emerald-400/10 text-emerald-400 border border-emerald-400/15'
+                  : 'text-gray-500 hover:text-gray-200 hover:bg-white/[0.03] border border-transparent'
+              }
+            `}
           >
-
             <User className="w-4 h-4" />
-
             Profile
-
           </NavLink>
 
           {/* SETTINGS */}
 
           <NavLink
             to="/settings"
-            className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
-              location.pathname === '/settings'
-                ? 'bg-emerald-400/10 text-emerald-400 border border-emerald-400/15'
-                : 'text-gray-500 hover:text-gray-200 hover:bg-white/[0.03] border border-transparent'
-            }`}
+            className={`
+              flex
+              items-center
+              gap-3
+              px-3
+              py-2.5
+              rounded-lg
+              text-sm
+              font-medium
+              transition-all
+              ${
+                location.pathname === '/settings'
+                  ? 'bg-emerald-400/10 text-emerald-400 border border-emerald-400/15'
+                  : 'text-gray-500 hover:text-gray-200 hover:bg-white/[0.03] border border-transparent'
+              }
+            `}
           >
-
             <Settings className="w-4 h-4" />
-
             Settings
-
           </NavLink>
 
           {/* LOGOUT */}
@@ -333,121 +455,120 @@ export function AppLayout() {
               font-medium
               text-gray-500
               hover:text-red-400
-              hover:bg-red-400/[0.05]
+              hover:bg-red-400/5
               border
               border-transparent
               transition-all
             "
           >
-
             <LogOut className="w-4 h-4" />
-
             Logout
-
           </button>
 
         </div>
-
       </aside>
 
       {/* ======================================================
           MOBILE HEADER
       ====================================================== */}
 
-      <header className="
-        md:hidden
-        fixed
-        top-0
-        left-0
-        right-0
-        bg-[#080A09]/95
-        backdrop-blur-xl
-        border-b
-        border-white/[0.04]
-        z-50
-      ">
+      <header
+        className="
+          md:hidden
+          fixed
+          top-0
+          left-0
+          right-0
+          bg-[#080A09]
+          border-b
+          border-white/[0.04]
+          z-50
+        "
+      >
 
-        {/* ==================================================
-            MOBILE HEADER BAR
+        {/* HEADER BAR */}
 
-            IMPORTANT:
-            Theme + Menu are normal flex children.
-            Nothing is fixed/absolute here.
-        ================================================== */}
-
-        <div className="
-          flex
-          items-center
-          justify-between
-          px-3
-          h-14
-          w-full
-        ">
-
-          {/* ==================================================
-              MOBILE LOGO
-          ================================================== */}
-
-          <div className="
+        <div
+          className="
             flex
             items-center
-            gap-2
-            min-w-0
-            flex-1
-          ">
+            justify-between
+            px-3
+            h-14
+            w-full
+          "
+        >
 
-            <div className="
-              w-8
-              h-8
-              rounded-lg
-              bg-gradient-to-br
-              from-emerald-400
-              to-emerald-600
+          {/* MOBILE LOGO */}
+
+          <div
+            className="
               flex
               items-center
-              justify-center
-              shrink-0
-            ">
-
+              gap-2
+              min-w-0
+              flex-1
+            "
+          >
+            <div
+              className="
+                w-8
+                h-8
+                rounded-lg
+                bg-gradient-to-br
+                from-emerald-400
+                to-emerald-600
+                flex
+                items-center
+                justify-center
+                shrink-0
+              "
+            >
               <Wallet
                 className="w-4 h-4 text-[#050505]"
                 strokeWidth={2.5}
               />
-
             </div>
 
-            <span className="
-              text-white
-              font-bold
-              tracking-tight
-              text-sm
-              truncate
-            ">
+            <span
+              className="
+                text-white
+                font-bold
+                tracking-tight
+                text-sm
+                truncate
+              "
+            >
               FINPILOT
             </span>
-
           </div>
 
           {/* ==================================================
               MOBILE ACTIONS
 
-              Theme and Menu have separate 40x40 areas.
-              They can NEVER overlap.
+              [ SUN/MOON ] [ MENU ]
+
+              Normal flex layout.
+              No absolute.
+              No fixed.
+              No overlap.
           ================================================== */}
 
-          <div className="
-            flex
-            items-center
-            gap-2
-            shrink-0
-            ml-3
-          ">
+          <div
+            className="
+              flex
+              items-center
+              gap-2
+              shrink-0
+              ml-3
+            "
+          >
 
-            {/* THEME */}
+            {/* THEME BUTTON */}
 
             <ThemeButton />
 
-            {/* MENU */}
+            {/* MENU BUTTON */}
 
             <button
               type="button"
@@ -479,13 +600,11 @@ export function AppLayout() {
                 shrink-0
               "
             >
-
               {mobileOpen ? (
                 <X className="w-5 h-5" />
               ) : (
                 <Menu className="w-5 h-5" />
               )}
-
             </button>
 
           </div>
@@ -497,84 +616,110 @@ export function AppLayout() {
         ================================================== */}
 
         {mobileOpen && (
-
-          <nav className="
-            p-3
-            border-t
-            border-white/[0.04]
-            space-y-0.5
-            bg-[#080A09]/95
-            backdrop-blur-xl
-            max-h-[calc(100vh-56px)]
-            overflow-y-auto
-          ">
+          <nav
+            className="
+              p-3
+              border-t
+              border-white/[0.04]
+              space-y-1
+              bg-[#080A09]
+              max-h-[calc(100vh-56px)]
+              overflow-y-auto
+            "
+          >
 
             {/* MAIN NAV */}
 
-            {navItems.map((item) => (
+            {navItems.map((item) => {
+              const Icon = item.icon;
 
-              <NavLink
-                key={item.to}
-                to={item.to}
-                onClick={closeMobileMenu}
-                className={({ isActive }) =>
-                  `flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium transition-all ${
-                    isActive
-                      ? 'bg-emerald-400/10 text-emerald-400'
-                      : 'text-gray-500 hover:text-gray-200 hover:bg-white/[0.03]'
-                  }`
-                }
-              >
+              return (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  onClick={closeMobileMenu}
+                  className={({ isActive }) =>
+                    `
+                      flex
+                      items-center
+                      gap-3
+                      px-3
+                      py-3
+                      rounded-lg
+                      text-sm
+                      font-medium
+                      transition-all
+                      ${
+                        isActive
+                          ? 'bg-emerald-400/10 text-emerald-400'
+                          : 'text-gray-500 hover:text-gray-200 hover:bg-white/[0.03]'
+                      }
+                    `
+                  }
+                >
+                  <Icon className="w-4 h-4" />
+                  {item.label}
+                </NavLink>
+              );
+            })}
 
-                <item.icon className="w-4 h-4" />
-
-                {item.label}
-
-              </NavLink>
-
-            ))}
-
-            {/* MOBILE PROFILE */}
+            {/* PROFILE */}
 
             <NavLink
               to="/profile"
               onClick={closeMobileMenu}
               className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium transition-all ${
-                  isActive
-                    ? 'bg-emerald-400/10 text-emerald-400'
-                    : 'text-gray-500 hover:text-gray-200 hover:bg-white/[0.03]'
-                }`
+                `
+                  flex
+                  items-center
+                  gap-3
+                  px-3
+                  py-3
+                  rounded-lg
+                  text-sm
+                  font-medium
+                  transition-all
+                  ${
+                    isActive
+                      ? 'bg-emerald-400/10 text-emerald-400'
+                      : 'text-gray-500 hover:text-gray-200 hover:bg-white/[0.03]'
+                  }
+                `
               }
             >
-
               <User className="w-4 h-4" />
-
               Profile
-
             </NavLink>
 
-            {/* MOBILE SETTINGS */}
+            {/* SETTINGS */}
 
             <NavLink
               to="/settings"
               onClick={closeMobileMenu}
               className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium transition-all ${
-                  isActive
-                    ? 'bg-emerald-400/10 text-emerald-400'
-                    : 'text-gray-500 hover:text-gray-200 hover:bg-white/[0.03]'
-                }`
+                `
+                  flex
+                  items-center
+                  gap-3
+                  px-3
+                  py-3
+                  rounded-lg
+                  text-sm
+                  font-medium
+                  transition-all
+                  ${
+                    isActive
+                      ? 'bg-emerald-400/10 text-emerald-400'
+                      : 'text-gray-500 hover:text-gray-200 hover:bg-white/[0.03]'
+                  }
+                `
               }
             >
-
               <Settings className="w-4 h-4" />
-
               Settings
-
             </NavLink>
 
-            {/* MOBILE LOGOUT */}
+            {/* LOGOUT */}
 
             <button
               type="button"
@@ -594,19 +739,15 @@ export function AppLayout() {
                 font-medium
                 text-gray-500
                 hover:text-red-400
-                hover:bg-red-400/[0.05]
+                hover:bg-red-400/5
                 transition-all
               "
             >
-
               <LogOut className="w-4 h-4" />
-
               Logout
-
             </button>
 
           </nav>
-
         )}
 
       </header>
@@ -615,26 +756,27 @@ export function AppLayout() {
           MAIN CONTENT
       ====================================================== */}
 
-      <main className="
-        flex-1
-        md:ml-60
-        pt-14
-        md:pt-0
-        relative
-        z-10
-      ">
-
-        <div className="
-          max-w-6xl
-          mx-auto
-          p-4
-          md:p-8
-        ">
-
+      <main
+        className="
+          flex-1
+          md:ml-60
+          pt-14
+          md:pt-0
+          relative
+          z-10
+          min-w-0
+        "
+      >
+        <div
+          className="
+            max-w-6xl
+            mx-auto
+            p-4
+            md:p-8
+          "
+        >
           <Outlet />
-
         </div>
-
       </main>
 
     </div>
