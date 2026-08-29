@@ -3,7 +3,6 @@ import type { ComponentType } from 'react';
 import { useState } from 'react';
 
 import { SplashScreen } from '@/components/SplashScreen';
-import { ThemeToggle } from '@/components/ThemeToggle';
 
 import { LandingPage } from '@/pages/Landing';
 import { AppLayout } from '@/layouts/AppLayout';
@@ -50,15 +49,6 @@ export default function App() {
 
   return (
     <BrowserRouter>
-      {/* ========================================================
-          GLOBAL THEME TOGGLE
-
-          Dark mode is the default.
-          User can switch to light mode from anywhere.
-      ======================================================== */}
-
-      <ThemeToggle />
-
       <Routes>
 
         {/* ======================================================
@@ -85,100 +75,67 @@ export default function App() {
 
         <Route element={<AppLayout />}>
 
-          {/* ====================================================
-              DASHBOARD
-          ==================================================== */}
-
+          {/* Dashboard */}
           <Route
             path="/dashboard"
             element={<DashboardPage />}
           />
 
-          {/* ====================================================
-              WHAT-IF SIMULATOR
-          ==================================================== */}
-
+          {/* What-If Simulator */}
           <Route
             path="/what-if"
             element={<WhatIfPage />}
           />
 
-          {/* ====================================================
-              TRANSACTIONS
-          ==================================================== */}
-
+          {/* Transactions */}
           <Route
             path="/transactions"
             element={<TransactionsPageComponent />}
           />
 
-          {/* ====================================================
-              INSIGHTS
-          ==================================================== */}
-
+          {/* Insights */}
           <Route
             path="/insights"
             element={<InsightsPage />}
           />
 
-          {/* ====================================================
-              BUDGET
-          ==================================================== */}
-
+          {/* Budget */}
           <Route
             path="/budget"
             element={<BudgetPage />}
           />
 
-          {/* ====================================================
-              GOALS
-          ==================================================== */}
-
+          {/* Goals */}
           <Route
             path="/goals"
             element={<GoalsPage />}
           />
 
-          {/* ====================================================
-              WEEKLY REPORT
-          ==================================================== */}
-
+          {/* Weekly Report */}
           <Route
             path="/weekly-report"
             element={<WeeklyReportPage />}
           />
 
-          {/* ====================================================
-              SHOULD I SPEND?
-          ==================================================== */}
-
+          {/* Should I Spend? */}
           <Route
             path="/ask"
             element={<AskPage />}
           />
 
-          {/* ====================================================
-              LOANS
-          ==================================================== */}
-
+          {/* Loans */}
           <Route
             path="/loans"
             element={<LoansPage />}
           />
 
-          {/* ====================================================
-              PROFILE
-          ==================================================== */}
-
+          {/* Profile */}
           <Route
             path="/profile"
             element={<ProfilePage />}
           />
 
-          {/* ====================================================
-              SETTINGS
-          ==================================================== */}
-
+          {/* Settings */}
           <Route
             path="/settings"
             element={<SettingsPage />}
