@@ -79,15 +79,11 @@ const navItems = [
 /* ============================================================
    THEME BUTTON
 
-   Dark mode = DEFAULT
-
-   Button:
-   - Dark mode -> Sun icon
-   - Light mode -> Moon icon
-
-   One button is rendered in the desktop sidebar and one
-   in the mobile header. They are not fixed/absolute, so
-   they cannot overlap the mobile menu button.
+   Important:
+   - NOT fixed
+   - NOT absolute
+   - Normal flex child
+   - Safe on mobile
 ============================================================ */
 
 function ThemeButton() {
@@ -111,9 +107,9 @@ function ThemeButton() {
     }
   }, [isLight]);
 
-  const toggleTheme = () => {
-    setIsLight((prev) => !prev);
-  };
+  function toggleTheme() {
+    setIsLight((current) => !current);
+  }
 
   return (
     <button
@@ -133,29 +129,31 @@ function ThemeButton() {
         flex
         items-center
         justify-center
-        w-10
-        h-10
+        w-9
+        h-9
+        sm:w-10
+        sm:h-10
+        shrink-0
         rounded-xl
         border
         border-emerald-400/20
-        bg-emerald-400/10
+        bg-emerald-400/[0.06]
         text-emerald-400
-        hover:bg-emerald-400/20
+        hover:bg-emerald-400/[0.12]
         hover:border-emerald-400/30
         active:scale-95
         transition-all
         touch-manipulation
-        shrink-0
       "
     >
       {isLight ? (
         <Moon
-          className="w-5 h-5"
+          className="w-[18px] h-[18px]"
           strokeWidth={2.2}
         />
       ) : (
         <Sun
-          className="w-5 h-5"
+          className="w-[18px] h-[18px]"
           strokeWidth={2.2}
         />
       )}
@@ -168,34 +166,43 @@ function ThemeButton() {
 ============================================================ */
 
 export function AppLayout() {
-  const [mobileOpen, setMobileOpen] = useState(false);
+  const [mobileOpen, setMobileOpen] =
+    useState(false);
 
   const location = useLocation();
 
-  /* ============================================================
+  /* ==========================================================
      LOGOUT
-  ============================================================ */
+  ========================================================== */
 
-  const handleLogout = () => {
+  function handleLogout() {
     window.location.href = '/';
-  };
+  }
 
-  /* ============================================================
+  /* ==========================================================
      CLOSE MOBILE MENU
-  ============================================================ */
+  ========================================================== */
 
-  const closeMobileMenu = () => {
+  function closeMobileMenu() {
     setMobileOpen(false);
-  };
+  }
+
+  /* ==========================================================
+     CLOSE MENU WHEN ROUTE CHANGES
+  ========================================================== */
+
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [location.pathname]);
 
   return (
     <div
       className="
         min-h-screen
+        flex
         bg-[#050505]
         text-gray-200
         grid-bg
-        flex
       "
     >
 
@@ -215,14 +222,14 @@ export function AppLayout() {
         <div
           className="
             absolute
-            top-10
-            left-5
+            top-[10%]
+            left-[5%]
             w-[400px]
             h-[400px]
-            bg-emerald-500
             rounded-full
-            blur-[100px]
+            bg-emerald-500
             opacity-[0.05]
+            blur-[100px]
           "
         />
 
@@ -235,8 +242,8 @@ export function AppLayout() {
             h-64
             rounded-full
             bg-emerald-600
+            opacity-[0.05]
             blur-3xl
-            opacity-5
           "
         />
       </div>
@@ -251,18 +258,22 @@ export function AppLayout() {
           md:flex
           flex-col
           w-60
-          bg-[#080A09]
-          border-r
-          border-white/[0.04]
+          shrink-0
           fixed
           left-0
           top-0
           h-screen
           z-40
+          bg-[#080A09]/95
+          backdrop-blur-xl
+          border-r
+          border-white/[0.04]
         "
       >
 
-        {/* DESKTOP LOGO */}
+        {/* ====================================================
+            DESKTOP LOGO
+        ==================================================== */}
 
         <div
           className="
@@ -271,13 +282,8 @@ export function AppLayout() {
             border-white/[0.04]
           "
         >
-          <div
-            className="
-              flex
-              items-center
-              gap-2.5
-            "
-          >
+          <div className="flex items-center gap-2.5">
+
             <div
               className="
                 w-8
@@ -307,10 +313,13 @@ export function AppLayout() {
             >
               FINPILOT
             </span>
+
           </div>
         </div>
 
-        {/* MAIN NAVIGATION */}
+        {/* ====================================================
+            DESKTOP NAVIGATION
+        ==================================================== */}
 
         <nav
           className="
@@ -354,7 +363,9 @@ export function AppLayout() {
           })}
         </nav>
 
-        {/* DESKTOP BOTTOM */}
+        {/* ====================================================
+            DESKTOP BOTTOM AREA
+        ==================================================== */}
 
         <div
           className="
@@ -376,12 +387,7 @@ export function AppLayout() {
               py-2
             "
           >
-            <span
-              className="
-                text-xs
-                text-gray-500
-              "
-            >
+            <span className="text-xs text-gray-500">
               Theme
             </span>
 
@@ -455,10 +461,10 @@ export function AppLayout() {
               font-medium
               text-gray-500
               hover:text-red-400
-              hover:bg-red-400/5
+              hover:bg-red-400/[0.05]
+              transition-all
               border
               border-transparent
-              transition-all
             "
           >
             <LogOut className="w-4 h-4" />
@@ -479,27 +485,35 @@ export function AppLayout() {
           top-0
           left-0
           right-0
-          bg-[#080A09]
+          z-50
+          bg-[#080A09]/95
+          backdrop-blur-xl
           border-b
           border-white/[0.04]
-          z-50
         "
       >
 
-        {/* HEADER BAR */}
+        {/* ====================================================
+            MOBILE TOP BAR
+
+            Layout:
+            FINPILOT       ☀️    ☰
+
+            Theme and menu are separate flex children.
+            Nothing is absolute.
+        ==================================================== */}
 
         <div
           className="
             flex
             items-center
-            justify-between
-            px-3
-            h-14
             w-full
+            h-14
+            px-3
           "
         >
 
-          {/* MOBILE LOGO */}
+          {/* LOGO */}
 
           <div
             className="
@@ -514,6 +528,7 @@ export function AppLayout() {
               className="
                 w-8
                 h-8
+                shrink-0
                 rounded-lg
                 bg-gradient-to-br
                 from-emerald-400
@@ -521,7 +536,6 @@ export function AppLayout() {
                 flex
                 items-center
                 justify-center
-                shrink-0
               "
             >
               <Wallet
@@ -546,12 +560,9 @@ export function AppLayout() {
           {/* ==================================================
               MOBILE ACTIONS
 
-              [ SUN/MOON ] [ MENU ]
-
-              Normal flex layout.
-              No absolute.
-              No fixed.
-              No overlap.
+              IMPORTANT:
+              Theme and Menu are in their own flex container.
+              They can NEVER overlap.
           ================================================== */}
 
           <div
@@ -560,15 +571,15 @@ export function AppLayout() {
               items-center
               gap-2
               shrink-0
-              ml-3
+              ml-2
             "
           >
 
-            {/* THEME BUTTON */}
+            {/* THEME */}
 
             <ThemeButton />
 
-            {/* MENU BUTTON */}
+            {/* MENU */}
 
             <button
               type="button"
@@ -585,8 +596,11 @@ export function AppLayout() {
                 flex
                 items-center
                 justify-center
-                w-10
-                h-10
+                w-9
+                h-9
+                sm:w-10
+                sm:h-10
+                shrink-0
                 rounded-xl
                 border
                 border-white/[0.06]
@@ -597,7 +611,6 @@ export function AppLayout() {
                 active:scale-95
                 transition-all
                 touch-manipulation
-                shrink-0
               "
             >
               {mobileOpen ? (
@@ -611,9 +624,9 @@ export function AppLayout() {
 
         </div>
 
-        {/* ==================================================
+        {/* ====================================================
             MOBILE MENU
-        ================================================== */}
+        ==================================================== */}
 
         {mobileOpen && (
           <nav
@@ -621,14 +634,13 @@ export function AppLayout() {
               p-3
               border-t
               border-white/[0.04]
-              space-y-1
-              bg-[#080A09]
+              space-y-0.5
+              bg-[#080A09]/95
+              backdrop-blur-xl
               max-h-[calc(100vh-56px)]
               overflow-y-auto
             "
           >
-
-            {/* MAIN NAV */}
 
             {navItems.map((item) => {
               const Icon = item.icon;
@@ -739,7 +751,7 @@ export function AppLayout() {
                 font-medium
                 text-gray-500
                 hover:text-red-400
-                hover:bg-red-400/5
+                hover:bg-red-400/[0.05]
                 transition-all
               "
             >
