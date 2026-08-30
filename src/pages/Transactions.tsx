@@ -1846,7 +1846,11 @@ function TransactionForm({
                   event.target.value,
                 )
               }
-              placeholder="e.g. Chocolate from supermarket"
+              placeholder={
+  type === "income"
+    ? "e.g. Monthly salary, freelance payment, client payment"
+    : "e.g. Chocolate from supermarket"
+}
               className="w-full rounded-xl border border-white/[0.08] bg-black/20 px-4 py-3 text-sm text-white outline-none focus:border-emerald-400/40"
               required
             />
