@@ -286,6 +286,9 @@ export function GoalsPage() {
         .split('T')[0]
     );
 
+  const [deleteGoalId, setDeleteGoalId] =
+    useState<string | null>(null);
+
   /*
    * ============================================================
    * GET CURRENT USER
@@ -519,30 +522,25 @@ export function GoalsPage() {
    * ============================================================
    */
 
-  function handleDeleteGoal(
-    id: string
-  ) {
-    const confirmed =
-      window.confirm(
-        'Delete this goal?'
-      );
+ function handleDeleteGoal(id: string) {
+  setDeleteGoalId(id);
+}
 
-    if (!confirmed) return;
+function confirmDeleteGoal() {
+  if (!deleteGoalId) return;
 
-    setGoals((previous) =>
-      previous.filter(
-        (goal) =>
-          goal.id !== id
-      )
-    );
+  setGoals((previous) =>
+    previous.filter(
+      (goal) => goal.id !== deleteGoalId
+    )
+  );
 
-    if (
-      savingGoal?.id === id
-    ) {
-      setSavingGoal(null);
-      setSavingAmount('');
-    }
+  if (savingGoal?.id === deleteGoalId) {
+    setSavingGoal(null);
   }
+
+  setDeleteGoalId(null);
+}
 
   /*
    * ============================================================
@@ -745,7 +743,7 @@ export function GoalsPage() {
                 <div className="relative mt-2">
 
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
-                    ₹
+                    â‚¹
                   </span>
 
                   <input
@@ -773,7 +771,7 @@ export function GoalsPage() {
                 <div className="relative mt-2">
 
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
-                    ₹
+                    â‚¹
                   </span>
 
                   <input
@@ -967,7 +965,7 @@ export function GoalsPage() {
               <div className="relative mt-2">
 
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
-                  ₹
+                  â‚¹
                 </span>
 
                 <input
@@ -1026,6 +1024,70 @@ export function GoalsPage() {
 
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* DELETE GOAL CONFIRMATION */}
+      {deleteGoalId && (
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm"
+          onClick={() => setDeleteGoalId(null)}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl border border-white/10 bg-[#111514] p-6 shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-red-500/10">
+                  <Trash2 className="h-5 w-5 text-red-400" />
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-semibold text-white">
+                    Delete this goal?
+                  </h3>
+
+                  <p className="mt-1 text-sm text-gray-400">
+                    This action cannot be undone.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setDeleteGoalId(null)}
+                className="rounded-lg p-2 text-gray-400 transition hover:bg-white/5 hover:text-white"
+                aria-label="Close delete confirmation"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="mt-5 rounded-xl border border-red-500/10 bg-red-500/5 p-4">
+              <p className="text-sm leading-6 text-gray-300">
+                Are you sure you want to permanently delete this goal?
+              </p>
+            </div>
+
+            <div className="mt-6 flex gap-3">
+              <button
+                type="button"
+                onClick={() => setDeleteGoalId(null)}
+                className="flex-1 rounded-xl border border-white/10 px-4 py-3 text-sm font-medium text-gray-300 transition hover:bg-white/5 hover:text-white"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={confirmDeleteGoal}
+                className="flex-1 rounded-xl bg-red-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-red-600"
+              >
+                Delete Goal
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -1159,7 +1221,7 @@ function GoalCard({
           </p>
 
           <p className="text-lg font-bold text-white mt-1">
-            ₹
+            â‚¹
             {goal.savedAmount.toLocaleString(
               'en-IN'
             )}
@@ -1172,7 +1234,7 @@ function GoalCard({
           </p>
 
           <p className="text-lg font-bold text-white mt-1">
-            ₹
+            â‚¹
             {goal.targetAmount.toLocaleString(
               'en-IN'
             )}
@@ -1194,7 +1256,7 @@ function GoalCard({
             </p>
 
             <p className="text-sm font-semibold text-white">
-              ₹
+              â‚¹
               {remaining.toLocaleString(
                 'en-IN'
               )}
@@ -1215,7 +1277,7 @@ function GoalCard({
             </p>
 
             <p className="text-xs font-semibold text-gray-300 mt-1">
-              ₹
+              â‚¹
               {goal.requiredDaily.toLocaleString(
                 'en-IN'
               )}
@@ -1228,7 +1290,7 @@ function GoalCard({
             </p>
 
             <p className="text-xs font-semibold text-gray-300 mt-1">
-              ₹
+              â‚¹
               {goal.requiredWeekly.toLocaleString(
                 'en-IN'
               )}
@@ -1241,7 +1303,7 @@ function GoalCard({
             </p>
 
             <p className="text-xs font-semibold text-gray-300 mt-1">
-              ₹
+              â‚¹
               {goal.requiredMonthly.toLocaleString(
                 'en-IN'
               )}
