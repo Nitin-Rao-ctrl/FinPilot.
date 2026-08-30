@@ -743,7 +743,7 @@ function confirmDeleteGoal() {
                 <div className="relative mt-2">
 
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
-                    â‚¹
+                    ₹
                   </span>
 
                   <input
@@ -771,7 +771,7 @@ function confirmDeleteGoal() {
                 <div className="relative mt-2">
 
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
-                    â‚¹
+                    ₹
                   </span>
 
                   <input
@@ -965,7 +965,7 @@ function confirmDeleteGoal() {
               <div className="relative mt-2">
 
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
-                  â‚¹
+                  ₹
                 </span>
 
                 <input
@@ -1221,7 +1221,7 @@ function GoalCard({
           </p>
 
           <p className="text-lg font-bold text-white mt-1">
-            â‚¹
+            ₹
             {goal.savedAmount.toLocaleString(
               'en-IN'
             )}
@@ -1234,7 +1234,7 @@ function GoalCard({
           </p>
 
           <p className="text-lg font-bold text-white mt-1">
-            â‚¹
+            ₹
             {goal.targetAmount.toLocaleString(
               'en-IN'
             )}
@@ -1256,7 +1256,7 @@ function GoalCard({
             </p>
 
             <p className="text-sm font-semibold text-white">
-              â‚¹
+              ₹
               {remaining.toLocaleString(
                 'en-IN'
               )}
@@ -1277,7 +1277,7 @@ function GoalCard({
             </p>
 
             <p className="text-xs font-semibold text-gray-300 mt-1">
-              â‚¹
+              ₹
               {goal.requiredDaily.toLocaleString(
                 'en-IN'
               )}
@@ -1290,7 +1290,7 @@ function GoalCard({
             </p>
 
             <p className="text-xs font-semibold text-gray-300 mt-1">
-              â‚¹
+              ₹
               {goal.requiredWeekly.toLocaleString(
                 'en-IN'
               )}
@@ -1303,7 +1303,7 @@ function GoalCard({
             </p>
 
             <p className="text-xs font-semibold text-gray-300 mt-1">
-              â‚¹
+              ₹
               {goal.requiredMonthly.toLocaleString(
                 'en-IN'
               )}
