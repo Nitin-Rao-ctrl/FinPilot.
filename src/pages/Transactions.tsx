@@ -16,6 +16,8 @@ import {
   Filter,
   Loader2,
   Sparkles,
+  CheckCircle2,
+  AlertCircle,
 } from "lucide-react";
 
 import { Reveal } from "@/lib/animations";
@@ -32,9 +34,7 @@ const API_BASE =
    TYPES
 ============================================================ */
 
-type TransactionType =
-  | "income"
-  | "expense";
+type TransactionType = "income" | "expense";
 
 type Transaction = {
   id?: string;
@@ -59,9 +59,7 @@ async function getUserId(): Promise<string> {
   } = await supabase.auth.getUser();
 
   if (error || !user) {
-    throw new Error(
-      "User is not logged in",
-    );
+    throw new Error("User is not logged in");
   }
 
   return user.id;
@@ -72,7 +70,6 @@ async function getUserId(): Promise<string> {
 ============================================================ */
 
 const CATEGORIES = [
-  /* Expense */
   "Food",
   "Travel",
   "Shopping",
@@ -83,26 +80,14 @@ const CATEGORIES = [
   "Rent",
   "Subscription",
   "Personal",
-
-  /* Income */
-  "Salary",
-  "Freelance",
-  "Business",
-  "Investment",
-  "Gift",
-  "Refund",
-
   "Other",
 ];
 
 /* ============================================================
-   EXPENSE CATEGORY RULES
+   CATEGORY RULES
 ============================================================ */
 
-const CATEGORY_RULES: Record<
-  string,
-  string[]
-> = {
+const CATEGORY_RULES: Record<string, string[]> = {
   Food: [
     "zomato",
     "swiggy",
@@ -325,139 +310,16 @@ const CATEGORY_RULES: Record<
 };
 
 /* ============================================================
-   INCOME CATEGORY RULES
-============================================================ */
-
-const INCOME_CATEGORY_RULES: Record<
-  string,
-  string[]
-> = {
-  Salary: [
-    "salary",
-    "payroll",
-    "paycheck",
-    "pay cheque",
-    "monthly salary",
-    "monthly pay",
-    "wages",
-    "wage",
-    "salary received",
-    "salary credited",
-    "salary credit",
-    "employee salary",
-    "job salary",
-  ],
-
-  Freelance: [
-    "freelance",
-    "freelancing",
-    "freelancer",
-    "freelance work",
-    "freelance payment",
-    "freelance income",
-    "client payment",
-    "client work",
-    "client income",
-    "project payment",
-    "project income",
-    "project work",
-    "contract work",
-    "contract payment",
-    "contract income",
-    "consulting",
-    "consultancy",
-    "gig payment",
-    "gig work",
-  ],
-
-  Business: [
-    "business",
-    "business income",
-    "business payment",
-    "business revenue",
-    "revenue",
-    "sales",
-    "sales income",
-    "shop income",
-    "store income",
-    "profit",
-    "business profit",
-    "customer payment",
-    "customer income",
-  ],
-
-  Investment: [
-    "investment",
-    "investments",
-    "investment income",
-    "investment return",
-    "investment returns",
-    "return on investment",
-    "dividend",
-    "dividends",
-    "dividend income",
-    "interest",
-    "interest income",
-    "mutual fund",
-    "mutual funds",
-    "stock return",
-    "stock returns",
-    "stocks",
-    "shares",
-    "capital gain",
-    "capital gains",
-    "portfolio return",
-    "trading profit",
-    "trading income",
-  ],
-
-  Gift: [
-    "gift",
-    "gift money",
-    "gift received",
-    "birthday gift",
-    "birthday money",
-    "present",
-    "money gift",
-    "family gift",
-  ],
-
-  Refund: [
-    "refund",
-    "refunded",
-    "cashback",
-    "cash back",
-    "cashback received",
-    "reimbursement",
-    "reimbursed",
-    "returned money",
-    "money returned",
-    "payment returned",
-  ],
-};
-
-/* ============================================================
    NORMALIZE TEXT
 ============================================================ */
 
-function normalizeText(
-  value: string,
-): string {
+function normalizeText(value: string): string {
   return value
     .toLowerCase()
     .normalize("NFKD")
-    .replace(
-      /[\u0300-\u036f]/g,
-      "",
-    )
-    .replace(
-      /[^a-z0-9\s.-]/g,
-      " ",
-    )
-    .replace(
-      /\s+/g,
-      " ",
-    )
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9\s.-]/g, " ")
+    .replace(/\s+/g, " ")
     .trim();
 }
 
@@ -476,30 +338,14 @@ function keywordMatches(
     return false;
   }
 
-  /*
-   * Multi-word keywords:
-   * "client payment"
-   * "monthly salary"
-   * "mutual fund"
-   */
-  if (
-    normalizedKeyword.includes(" ")
-  ) {
-    return text.includes(
-      normalizedKeyword,
-    );
+  if (normalizedKeyword.includes(" ")) {
+    return text.includes(normalizedKeyword);
   }
 
-  /*
-   * Single-word keywords must match
-   * complete words.
-   */
-  const words =
-    text.split(" ");
+  const words = text.split(" ");
 
   return words.some(
-    (word) =>
-      word === normalizedKeyword,
+    (word) => word === normalizedKeyword,
   );
 }
 
@@ -510,7 +356,6 @@ function keywordMatches(
 function predictCategory(
   description: string,
   merchant: string,
-  type: TransactionType,
 ): string {
   const text = normalizeText(
     `${description} ${merchant}`,
@@ -520,48 +365,7 @@ function predictCategory(
     return "Other";
   }
 
-  /* ==========================================================
-     INCOME
-  ========================================================== */
-
-  if (type === "income") {
-    const incomePriority = [
-      "Salary",
-      "Freelance",
-      "Business",
-      "Investment",
-      "Gift",
-      "Refund",
-    ];
-
-    for (const category of incomePriority) {
-      const keywords =
-        INCOME_CATEGORY_RULES[
-          category
-        ] || [];
-
-      const matched =
-        keywords.some(
-          (keyword) =>
-            keywordMatches(
-              text,
-              keyword,
-            ),
-        );
-
-      if (matched) {
-        return category;
-      }
-    }
-
-    return "Other";
-  }
-
-  /* ==========================================================
-     EXPENSE
-  ========================================================== */
-
-  const expensePriority = [
+  const priority = [
     "Food",
     "Bills",
     "Travel",
@@ -574,20 +378,14 @@ function predictCategory(
     "Personal",
   ];
 
-  for (const category of expensePriority) {
+  for (const category of priority) {
     const keywords =
-      CATEGORY_RULES[
-        category
-      ] || [];
+      CATEGORY_RULES[category] || [];
 
-    const matched =
-      keywords.some(
-        (keyword) =>
-          keywordMatches(
-            text,
-            keyword,
-          ),
-      );
+    const matched = keywords.some(
+      (keyword) =>
+        keywordMatches(text, keyword),
+    );
 
     if (matched) {
       return category;
@@ -607,12 +405,10 @@ function normalizeTransaction(
   return {
     id: transaction?.id,
     _id: transaction?._id,
-    userId:
-      transaction?.userId,
+    userId: transaction?.userId,
 
     type:
-      transaction?.type ===
-      "income"
+      transaction?.type === "income"
         ? "income"
         : "expense",
 
@@ -621,16 +417,13 @@ function normalizeTransaction(
     ),
 
     category:
-      transaction?.category ||
-      "Other",
+      transaction?.category || "Other",
 
     description:
-      transaction?.description ||
-      "",
+      transaction?.description || "",
 
     merchant:
-      transaction?.merchant ||
-      "",
+      transaction?.merchant || "",
 
     date:
       transaction?.date ||
@@ -644,21 +437,14 @@ function normalizeTransaction(
    DATE FORMAT
 ============================================================ */
 
-function formatDate(
-  date: string,
-): string {
+function formatDate(date: string): string {
   if (!date) {
     return "";
   }
 
-  const parsed =
-    new Date(date);
+  const parsed = new Date(date);
 
-  if (
-    Number.isNaN(
-      parsed.getTime(),
-    )
-  ) {
+  if (Number.isNaN(parsed.getTime())) {
     return date;
   }
 
@@ -677,58 +463,55 @@ function formatDate(
 ============================================================ */
 
 export function TransactionsPage() {
-  const [
-    transactions,
-    setTransactions,
-  ] = useState<
-    Transaction[]
-  >([]);
+  const [transactions, setTransactions] =
+    useState<Transaction[]>([]);
 
-  const [
-    search,
-    setSearch,
-  ] = useState("");
+  const [search, setSearch] =
+    useState("");
 
-  const [
-    filterType,
-    setFilterType,
-  ] = useState<
-    "all" | TransactionType
-  >("all");
+  const [filterType, setFilterType] =
+    useState<
+      "all" | TransactionType
+    >("all");
 
-  const [
-    filterCategory,
-    setFilterCategory,
-  ] = useState("all");
+  const [filterCategory, setFilterCategory] =
+    useState("all");
 
-  const [
-    sortBy,
-    setSortBy,
-  ] = useState<
-    "date" | "amount"
-  >("date");
+  const [sortBy, setSortBy] =
+    useState<"date" | "amount">("date");
 
-  const [
-    showForm,
-    setShowForm,
-  ] = useState(false);
+  const [showForm, setShowForm] =
+    useState(false);
 
-  const [
-    editing,
-    setEditing,
-  ] = useState<
-    Transaction | null
-  >(null);
+  const [editing, setEditing] =
+    useState<Transaction | null>(null);
 
-  const [
-    loading,
-    setLoading,
-  ] = useState(true);
+  const [loading, setLoading] =
+    useState(true);
 
-  const [
-    actionLoading,
-    setActionLoading,
-  ] = useState(false);
+  const [actionLoading, setActionLoading] =
+    useState(false);
+
+  /* ==========================================================
+     CUSTOM DELETE MODAL
+  ========================================================== */
+
+  const [deleteTarget, setDeleteTarget] =
+    useState<Transaction | null>(null);
+
+  /* ==========================================================
+     DELETE SUCCESS MODAL
+  ========================================================== */
+
+  const [deleteSuccess, setDeleteSuccess] =
+    useState(false);
+
+  /* ==========================================================
+     ERROR MODAL
+  ========================================================== */
+
+  const [errorMessage, setErrorMessage] =
+    useState<string | null>(null);
 
   /* ==========================================================
      FETCH
@@ -738,15 +521,13 @@ export function TransactionsPage() {
     try {
       setLoading(true);
 
-      const userId =
-        await getUserId();
+      const userId = await getUserId();
 
-      const response =
-        await fetch(
-          `${API_BASE}/transactions?userId=${encodeURIComponent(
-            userId,
-          )}`,
-        );
+      const response = await fetch(
+        `${API_BASE}/transactions?userId=${encodeURIComponent(
+          userId,
+        )}`,
+      );
 
       if (!response.ok) {
         throw new Error(
@@ -757,19 +538,16 @@ export function TransactionsPage() {
       const data =
         await response.json();
 
-      const list =
-        Array.isArray(data)
-          ? data
-          : Array.isArray(
-                data?.transactions,
-              )
-            ? data.transactions
-            : [];
+      const list = Array.isArray(data)
+        ? data
+        : Array.isArray(
+              data?.transactions,
+            )
+          ? data.transactions
+          : [];
 
       setTransactions(
-        list.map(
-          normalizeTransaction,
-        ),
+        list.map(normalizeTransaction),
       );
     } catch (error) {
       console.error(
@@ -791,155 +569,123 @@ export function TransactionsPage() {
      FILTER + SORT
   ========================================================== */
 
-  const filtered =
-    useMemo(() => {
-      let result = [
-        ...transactions,
-      ];
+  const filtered = useMemo(() => {
+    let result = [
+      ...transactions,
+    ];
 
-      if (search.trim()) {
-        const q =
-          normalizeText(search);
+    if (search.trim()) {
+      const q =
+        normalizeText(search);
 
-        result =
-          result.filter(
-            (transaction) => {
-              const description =
-                normalizeText(
-                  transaction.description,
-                );
-
-              const merchant =
-                normalizeText(
-                  transaction.merchant ||
-                    "",
-                );
-
-              const category =
-                normalizeText(
-                  transaction.category,
-                );
-
-              return (
-                description.includes(q) ||
-                merchant.includes(q) ||
-                category.includes(q)
-              );
-            },
-          );
-      }
-
-      if (
-        filterType !==
-        "all"
-      ) {
-        result =
-          result.filter(
-            (transaction) =>
-              transaction.type ===
-              filterType,
-          );
-      }
-
-      if (
-        filterCategory !==
-        "all"
-      ) {
-        result =
-          result.filter(
-            (transaction) =>
-              transaction.category ===
-              filterCategory,
-          );
-      }
-
-      result.sort(
-        (a, b) => {
-          if (
-            sortBy ===
-            "amount"
-          ) {
-            return (
-              Number(
-                b.amount || 0,
-              ) -
-              Number(
-                a.amount || 0,
-              )
+      result = result.filter(
+        (transaction) => {
+          const description =
+            normalizeText(
+              transaction.description,
             );
-          }
+
+          const merchant =
+            normalizeText(
+              transaction.merchant || "",
+            );
+
+          const category =
+            normalizeText(
+              transaction.category,
+            );
 
           return (
-            new Date(
-              b.date,
-            ).getTime() -
-            new Date(
-              a.date,
-            ).getTime()
+            description.includes(q) ||
+            merchant.includes(q) ||
+            category.includes(q)
           );
         },
       );
+    }
 
-      return result;
-    }, [
-      transactions,
-      search,
-      filterType,
-      filterCategory,
-      sortBy,
-    ]);
+    if (filterType !== "all") {
+      result =
+        result.filter(
+          (transaction) =>
+            transaction.type ===
+            filterType,
+        );
+    }
+
+    if (filterCategory !== "all") {
+      result =
+        result.filter(
+          (transaction) =>
+            transaction.category ===
+            filterCategory,
+        );
+    }
+
+    result.sort((a, b) => {
+      if (sortBy === "amount") {
+        return (
+          Number(b.amount || 0) -
+          Number(a.amount || 0)
+        );
+      }
+
+      return (
+        new Date(b.date).getTime() -
+        new Date(a.date).getTime()
+      );
+    });
+
+    return result;
+  }, [
+    transactions,
+    search,
+    filterType,
+    filterCategory,
+    sortBy,
+  ]);
 
   /* ==========================================================
      TOTALS
   ========================================================== */
 
-  const totalIncome =
-    useMemo(
-      () =>
-        transactions
-          .filter(
-            (transaction) =>
-              transaction.type ===
-              "income",
-          )
-          .reduce(
-            (
-              sum,
-              transaction,
-            ) =>
-              sum +
-              Number(
-                transaction.amount ||
-                  0,
-              ),
-            0,
-          ),
-      [transactions],
-    );
+  const totalIncome = useMemo(
+    () =>
+      transactions
+        .filter(
+          (transaction) =>
+            transaction.type ===
+            "income",
+        )
+        .reduce(
+          (sum, transaction) =>
+            sum +
+            Number(
+              transaction.amount || 0,
+            ),
+          0,
+        ),
+    [transactions],
+  );
 
-  const totalExpense =
-    useMemo(
-      () =>
-        transactions
-          .filter(
-            (transaction) =>
-              transaction.type ===
-              "expense",
-          )
-          .reduce(
-            (
-              sum,
-              transaction,
-            ) =>
-              sum +
-              Number(
-                transaction.amount ||
-                  0,
-              ),
-            0,
-          ),
-      [transactions],
-    );
+  const totalExpense = useMemo(
+    () =>
+      transactions
+        .filter(
+          (transaction) =>
+            transaction.type ===
+            "expense",
+        )
+        .reduce(
+          (sum, transaction) =>
+            sum +
+            Number(
+              transaction.amount || 0,
+            ),
+          0,
+        ),
+    [transactions],
+  );
 
   /* ==========================================================
      CREATE / UPDATE
@@ -957,36 +703,29 @@ export function TransactionsPage() {
       const payload = {
         ...data,
         userId,
-        amount: Number(
-          data.amount,
-        ),
+        amount: Number(data.amount),
       };
 
       const transactionId =
-        data.id ||
-        data._id;
+        data.id || data._id;
 
-      const response =
-        await fetch(
-          transactionId
-            ? `${API_BASE}/transactions/${transactionId}`
-            : `${API_BASE}/transactions`,
-          {
-            method:
-              transactionId
-                ? "PUT"
-                : "POST",
-
-            headers: {
-              "Content-Type":
-                "application/json",
-            },
-
-            body: JSON.stringify(
-              payload,
-            ),
+      const response = await fetch(
+        transactionId
+          ? `${API_BASE}/transactions/${transactionId}`
+          : `${API_BASE}/transactions`,
+        {
+          method: transactionId
+            ? "PUT"
+            : "POST",
+          headers: {
+            "Content-Type":
+              "application/json",
           },
-        );
+          body: JSON.stringify(
+            payload,
+          ),
+        },
+      );
 
       if (!response.ok) {
         const text =
@@ -1007,7 +746,7 @@ export function TransactionsPage() {
         error,
       );
 
-      alert(
+      setErrorMessage(
         "Could not save transaction.",
       );
     } finally {
@@ -1027,10 +766,10 @@ export function TransactionsPage() {
   }
 
   /* ==========================================================
-     DELETE
+     OPEN DELETE MODAL
   ========================================================== */
 
-  async function handleDelete(
+  function handleDelete(
     transaction: Transaction,
   ) {
     const id =
@@ -1038,18 +777,33 @@ export function TransactionsPage() {
       transaction.id;
 
     if (!id) {
-      alert(
+      setErrorMessage(
         "Transaction ID is missing.",
       );
       return;
     }
 
-    const confirmed =
-      window.confirm(
-        "Are you sure you want to delete this transaction?",
-      );
+    setDeleteTarget(transaction);
+  }
 
-    if (!confirmed) {
+  /* ==========================================================
+     CONFIRM DELETE
+  ========================================================== */
+
+  async function confirmDelete() {
+    if (!deleteTarget) {
+      return;
+    }
+
+    const id =
+      deleteTarget._id ||
+      deleteTarget.id;
+
+    if (!id) {
+      setDeleteTarget(null);
+      setErrorMessage(
+        "Transaction ID is missing.",
+      );
       return;
     }
 
@@ -1060,21 +814,15 @@ export function TransactionsPage() {
         await getUserId();
 
       const url =
-        `${API_BASE}/transactions/${encodeURIComponent(
-          id,
-        )}` +
-        `?userId=${encodeURIComponent(
-          userId,
-        )}`;
+        `${API_BASE}/transactions/${encodeURIComponent(id)}` +
+        `?userId=${encodeURIComponent(userId)}`;
 
-      const response =
-        await fetch(url, {
-          method: "DELETE",
-          headers: {
-            Accept:
-              "application/json",
-          },
-        });
+      const response = await fetch(url, {
+        method: "DELETE",
+        headers: {
+          Accept: "application/json",
+        },
+      });
 
       const responseText =
         await response.text();
@@ -1088,6 +836,7 @@ export function TransactionsPage() {
         );
       }
 
+      /* Remove from UI after backend confirms */
       setTransactions(
         (previous) =>
           previous.filter(
@@ -1097,16 +846,20 @@ export function TransactionsPage() {
           ),
       );
 
-      alert(
-        "Transaction deleted successfully.",
-      );
+      /* Close confirmation */
+      setDeleteTarget(null);
+
+      /* Show custom success modal */
+      setDeleteSuccess(true);
     } catch (error) {
       console.error(
         "Error deleting transaction:",
         error,
       );
 
-      alert(
+      setDeleteTarget(null);
+
+      setErrorMessage(
         error instanceof Error
           ? error.message
           : "Could not delete transaction.",
@@ -1121,376 +874,569 @@ export function TransactionsPage() {
   ========================================================== */
 
   return (
-    <div className="space-y-6">
-      <Reveal>
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-white">
-              Transactions
-            </h1>
+    <>
+      <div className="space-y-6">
+        <Reveal>
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-white">
+                Transactions
+              </h1>
 
-            <p className="text-sm text-gray-500 mt-1">
-              Track and manage your
-              income and expenses.
+              <p className="text-sm text-gray-500 mt-1">
+                Track and manage your income
+                and expenses.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setEditing(null);
+                setShowForm(true);
+              }}
+              className="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 bg-emerald-500 text-black font-semibold hover:bg-emerald-400 transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              Add Transaction
+            </button>
+          </div>
+        </Reveal>
+
+        {/* ======================================================
+            SUMMARY
+        ====================================================== */}
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-5">
+            <div className="flex items-center gap-3">
+              <ArrowUpCircle className="w-5 h-5 text-emerald-400" />
+
+              <span className="text-sm text-gray-400">
+                Total Income
+              </span>
+            </div>
+
+            <p className="text-2xl font-bold text-white mt-3">
+              ₹
+              {totalIncome.toLocaleString(
+                "en-IN",
+                {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                },
+              )}
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={() => {
-              setEditing(null);
-              setShowForm(true);
-            }}
-            className="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 bg-emerald-500 text-black font-semibold hover:bg-emerald-400 transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            Add Transaction
-          </button>
-        </div>
-      </Reveal>
+          <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-5">
+            <div className="flex items-center gap-3">
+              <ArrowDownCircle className="w-5 h-5 text-red-400" />
 
-      {/* ======================================================
-          SUMMARY
-      ====================================================== */}
+              <span className="text-sm text-gray-400">
+                Total Expense
+              </span>
+            </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-5">
-          <div className="flex items-center gap-3">
-            <ArrowUpCircle className="w-5 h-5 text-emerald-400" />
-
-            <span className="text-sm text-gray-400">
-              Total Income
-            </span>
+            <p className="text-2xl font-bold text-white mt-3">
+              ₹
+              {totalExpense.toLocaleString(
+                "en-IN",
+                {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                },
+              )}
+            </p>
           </div>
 
-          <p className="text-2xl font-bold text-white mt-3">
-            ₹
-            {totalIncome.toLocaleString(
-              "en-IN",
-              {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              },
-            )}
-          </p>
-        </div>
+          <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-5">
+            <div className="flex items-center gap-3">
+              <Sparkles className="w-5 h-5 text-emerald-400" />
 
-        <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-5">
-          <div className="flex items-center gap-3">
-            <ArrowDownCircle className="w-5 h-5 text-red-400" />
+              <span className="text-sm text-gray-400">
+                Balance
+              </span>
+            </div>
 
-            <span className="text-sm text-gray-400">
-              Total Expense
-            </span>
+            <p className="text-2xl font-bold text-white mt-3">
+              ₹
+              {(
+                totalIncome -
+                totalExpense
+              ).toLocaleString(
+                "en-IN",
+                {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                },
+              )}
+            </p>
           </div>
-
-          <p className="text-2xl font-bold text-white mt-3">
-            ₹
-            {totalExpense.toLocaleString(
-              "en-IN",
-              {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              },
-            )}
-          </p>
         </div>
 
-        <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-5">
-          <div className="flex items-center gap-3">
-            <Sparkles className="w-5 h-5 text-emerald-400" />
+        {/* ======================================================
+            FILTERS
+        ====================================================== */}
 
-            <span className="text-sm text-gray-400">
-              Balance
-            </span>
-          </div>
+        <Reveal>
+          <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
 
-          <p className="text-2xl font-bold text-white mt-3">
-            ₹
-            {(
-              totalIncome -
-              totalExpense
-            ).toLocaleString(
-              "en-IN",
-              {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              },
-            )}
-          </p>
-        </div>
-      </div>
+                <input
+                  value={search}
+                  onChange={(event) =>
+                    setSearch(
+                      event.target.value,
+                    )
+                  }
+                  placeholder="Search transactions..."
+                  className="w-full rounded-xl border border-white/[0.08] bg-black/20 pl-10 pr-3 py-2.5 text-sm text-white outline-none focus:border-emerald-400/40"
+                />
+              </div>
 
-      {/* ======================================================
-          FILTERS
-      ====================================================== */}
-
-      <Reveal>
-        <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-4">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-
-              <input
-                value={search}
+              <select
+                value={filterType}
                 onChange={(event) =>
-                  setSearch(
+                  setFilterType(
+                    event.target
+                      .value as
+                      | "all"
+                      | TransactionType,
+                  )
+                }
+                className="rounded-xl border border-white/[0.08] bg-black/20 px-3 py-2.5 text-sm text-white outline-none"
+              >
+                <option value="all">
+                  All Types
+                </option>
+
+                <option value="income">
+                  Income
+                </option>
+
+                <option value="expense">
+                  Expense
+                </option>
+              </select>
+
+              <select
+                value={filterCategory}
+                onChange={(event) =>
+                  setFilterCategory(
                     event.target.value,
                   )
                 }
-                placeholder="Search transactions..."
-                className="w-full rounded-xl border border-white/[0.08] bg-black/20 pl-10 pr-3 py-2.5 text-sm text-white outline-none focus:border-emerald-400/40"
-              />
-            </div>
-
-            <select
-              value={filterType}
-              onChange={(event) =>
-                setFilterType(
-                  event.target
-                    .value as
-                    | "all"
-                    | TransactionType,
-                )
-              }
-              className="rounded-xl border border-white/[0.08] bg-black/20 px-3 py-2.5 text-sm text-white outline-none"
-            >
-              <option value="all">
-                All Types
-              </option>
-
-              <option value="income">
-                Income
-              </option>
-
-              <option value="expense">
-                Expense
-              </option>
-            </select>
-
-            <select
-              value={
-                filterCategory
-              }
-              onChange={(event) =>
-                setFilterCategory(
-                  event.target.value,
-                )
-              }
-              className="rounded-xl border border-white/[0.08] bg-black/20 px-3 py-2.5 text-sm text-white outline-none"
-            >
-              <option value="all">
-                All Categories
-              </option>
-
-              {CATEGORIES.map(
-                (category) => (
-                  <option
-                    key={category}
-                    value={category}
-                  >
-                    {category}
-                  </option>
-                ),
-              )}
-            </select>
-
-            <select
-              value={sortBy}
-              onChange={(event) =>
-                setSortBy(
-                  event.target
-                    .value as
-                    | "date"
-                    | "amount",
-                )
-              }
-              className="rounded-xl border border-white/[0.08] bg-black/20 px-3 py-2.5 text-sm text-white outline-none"
-            >
-              <option value="date">
-                Sort by Date
-              </option>
-
-              <option value="amount">
-                Sort by Amount
-              </option>
-            </select>
-          </div>
-        </div>
-      </Reveal>
-
-      {/* ======================================================
-          TRANSACTION LIST
-      ====================================================== */}
-
-      <Reveal>
-        <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] overflow-hidden">
-          {loading ? (
-            <div className="flex items-center justify-center py-20">
-              <Loader2 className="w-6 h-6 text-emerald-400 animate-spin" />
-            </div>
-          ) : filtered.length ===
-            0 ? (
-            <div className="py-20 text-center">
-              <Filter className="w-8 h-8 text-gray-600 mx-auto mb-3" />
-
-              <p className="text-gray-400">
-                No transactions found.
-              </p>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setEditing(null);
-                  setShowForm(true);
-                }}
-                className="mt-4 text-sm text-emerald-400 hover:text-emerald-300"
+                className="rounded-xl border border-white/[0.08] bg-black/20 px-3 py-2.5 text-sm text-white outline-none"
               >
-                Add your first
-                transaction
-              </button>
-            </div>
-          ) : (
-            <div>
-              {filtered.map(
-                (transaction) => {
-                  const isIncome =
-                    transaction.type ===
-                    "income";
+                <option value="all">
+                  All Categories
+                </option>
 
-                  return (
-                    <div
-                      key={
-                        transaction.id ||
-                        transaction._id
-                      }
-                      className="flex items-center gap-4 px-5 py-4 border-b border-white/[0.05] last:border-b-0"
+                {CATEGORIES.map(
+                  (category) => (
+                    <option
+                      key={category}
+                      value={category}
                     >
+                      {category}
+                    </option>
+                  ),
+                )}
+              </select>
+
+              <select
+                value={sortBy}
+                onChange={(event) =>
+                  setSortBy(
+                    event.target
+                      .value as
+                      | "date"
+                      | "amount",
+                  )
+                }
+                className="rounded-xl border border-white/[0.08] bg-black/20 px-3 py-2.5 text-sm text-white outline-none"
+              >
+                <option value="date">
+                  Sort by Date
+                </option>
+
+                <option value="amount">
+                  Sort by Amount
+                </option>
+              </select>
+            </div>
+          </div>
+        </Reveal>
+
+        {/* ======================================================
+            TRANSACTION LIST
+        ====================================================== */}
+
+        <Reveal>
+          <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] overflow-hidden">
+            {loading ? (
+              <div className="flex items-center justify-center py-20">
+                <Loader2 className="w-6 h-6 text-emerald-400 animate-spin" />
+              </div>
+            ) : filtered.length === 0 ? (
+              <div className="py-20 text-center">
+                <Filter className="w-8 h-8 text-gray-600 mx-auto mb-3" />
+
+                <p className="text-gray-400">
+                  No transactions found.
+                </p>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditing(null);
+                    setShowForm(true);
+                  }}
+                  className="mt-4 text-sm text-emerald-400 hover:text-emerald-300"
+                >
+                  Add your first transaction
+                </button>
+              </div>
+            ) : (
+              <div>
+                {filtered.map(
+                  (transaction) => {
+                    const isIncome =
+                      transaction.type ===
+                      "income";
+
+                    return (
                       <div
-                        className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                          isIncome
-                            ? "bg-emerald-400/10"
-                            : "bg-red-400/10"
-                        }`}
+                        key={
+                          transaction.id ||
+                          transaction._id
+                        }
+                        className="flex items-center gap-4 px-5 py-4 border-b border-white/[0.05] last:border-b-0"
                       >
-                        {isIncome ? (
-                          <ArrowUpCircle className="w-5 h-5 text-emerald-400" />
-                        ) : (
-                          <ArrowDownCircle className="w-5 h-5 text-red-400" />
-                        )}
-                      </div>
+                        <div
+                          className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                            isIncome
+                              ? "bg-emerald-400/10"
+                              : "bg-red-400/10"
+                          }`}
+                        >
+                          {isIncome ? (
+                            <ArrowUpCircle className="w-5 h-5 text-emerald-400" />
+                          ) : (
+                            <ArrowDownCircle className="w-5 h-5 text-red-400" />
+                          )}
+                        </div>
 
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-white truncate">
-                          {transaction.description ||
-                            "Transaction"}
-                        </p>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-white truncate">
+                            {transaction.description ||
+                              "Transaction"}
+                          </p>
 
-                        <div className="flex flex-wrap items-center gap-2 mt-1">
-                          <span className="text-xs text-gray-500">
-                            {transaction.merchant ||
-                              "No merchant"}
-                          </span>
+                          <div className="flex flex-wrap items-center gap-2 mt-1">
+                            <span className="text-xs text-gray-500">
+                              {transaction.merchant ||
+                                "No merchant"}
+                            </span>
 
-                          <span className="text-gray-700">
-                            •
-                          </span>
+                            <span className="text-gray-700">
+                              •
+                            </span>
 
-                          <span className="text-xs text-emerald-400">
+                            <span className="text-xs text-emerald-400">
+                              {transaction.category}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="text-xs text-gray-500 hidden sm:block">
+                          {formatDate(
+                            transaction.date,
+                          )}
+                        </div>
+
+                        <div
+                          className={`text-sm font-semibold ${
+                            isIncome
+                              ? "text-emerald-400"
+                              : "text-red-400"
+                          }`}
+                        >
+                          {isIncome
+                            ? "+"
+                            : "-"}
+                          ₹
+                          {Number(
+                            transaction.amount ||
+                              0,
+                          ).toLocaleString(
+                            "en-IN",
                             {
-                              transaction.category
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            },
+                          )}
+                        </div>
+
+                        <div className="flex gap-1">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleEdit(
+                                transaction,
+                              )
                             }
-                          </span>
+                            disabled={
+                              actionLoading
+                            }
+                            className="p-2 rounded-lg text-gray-500 hover:text-white hover:bg-white/[0.05]"
+                            title="Edit"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleDelete(
+                                transaction,
+                              )
+                            }
+                            disabled={
+                              actionLoading
+                            }
+                            className="p-2 rounded-lg text-gray-500 hover:text-red-400 hover:bg-red-400/[0.05]"
+                            title="Delete"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
                         </div>
                       </div>
+                    );
+                  },
+                )}
+              </div>
+            )}
+          </div>
+        </Reveal>
 
-                      <div className="text-xs text-gray-500 hidden sm:block">
-                        {formatDate(
-                          transaction.date,
-                        )}
-                      </div>
+        {/* ======================================================
+            FORM MODAL
+        ====================================================== */}
 
-                      <div
-                        className={`text-sm font-semibold ${
-                          isIncome
-                            ? "text-emerald-400"
-                            : "text-red-400"
-                        }`}
-                      >
-                        {isIncome
-                          ? "+"
-                          : "-"}
-                        ₹
-                        {Number(
-                          transaction.amount ||
-                            0,
-                        ).toLocaleString(
-                          "en-IN",
-                          {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                          },
-                        )}
-                      </div>
+        {showForm && (
+          <TransactionForm
+            editing={editing}
+            onClose={() => {
+              setShowForm(false);
+              setEditing(null);
+            }}
+            onSave={handleSave}
+            saving={actionLoading}
+          />
+        )}
+      </div>
 
-                      <div className="flex gap-1">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            handleEdit(
-                              transaction,
-                            )
-                          }
-                          disabled={
-                            actionLoading
-                          }
-                          className="p-2 rounded-lg text-gray-500 hover:text-white hover:bg-white/[0.05]"
-                          title="Edit"
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </button>
+      {/* ========================================================
+          DELETE CONFIRMATION MODAL
+      ======================================================== */}
 
-                        <button
-                          type="button"
-                          onClick={() =>
-                            handleDelete(
-                              transaction,
-                            )
-                          }
-                          disabled={
-                            actionLoading
-                          }
-                          className="p-2 rounded-lg text-gray-500 hover:text-red-400 hover:bg-red-400/[0.05]"
-                          title="Delete"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                  );
-                },
-              )}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/70 backdrop-blur-md"
+            onClick={() => {
+              if (!actionLoading) {
+                setDeleteTarget(null);
+              }
+            }}
+          />
+
+          <div className="relative w-full max-w-md rounded-3xl border border-white/[0.10] bg-[#101313] shadow-2xl overflow-hidden">
+            <div className="p-6">
+              <div className="flex items-start justify-between">
+                <div className="w-12 h-12 rounded-2xl bg-red-400/10 border border-red-400/20 flex items-center justify-center">
+                  <Trash2 className="w-6 h-6 text-red-400" />
+                </div>
+
+                <button
+                  type="button"
+                  disabled={actionLoading}
+                  onClick={() =>
+                    setDeleteTarget(null)
+                  }
+                  className="p-2 rounded-xl text-gray-500 hover:text-white hover:bg-white/[0.05] transition"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <h2 className="text-xl font-semibold text-white mt-5">
+                Delete transaction?
+              </h2>
+
+              <p className="text-sm text-gray-400 mt-2 leading-6">
+                Are you sure you want to delete
+                this transaction? This action
+                cannot be undone.
+              </p>
+
+              <div className="mt-5 rounded-2xl border border-white/[0.06] bg-white/[0.03] p-4">
+                <p className="text-sm font-medium text-white truncate">
+                  {deleteTarget.description ||
+                    "Transaction"}
+                </p>
+
+                <div className="flex items-center justify-between mt-2">
+                  <span className="text-xs text-gray-500">
+                    {deleteTarget.category}
+                  </span>
+
+                  <span
+                    className={`text-sm font-semibold ${
+                      deleteTarget.type ===
+                      "income"
+                        ? "text-emerald-400"
+                        : "text-red-400"
+                    }`}
+                  >
+                    {deleteTarget.type ===
+                    "income"
+                      ? "+"
+                      : "-"}
+                    ₹
+                    {Number(
+                      deleteTarget.amount ||
+                        0,
+                    ).toLocaleString(
+                      "en-IN",
+                      {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      },
+                    )}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex gap-3 mt-6">
+                <button
+                  type="button"
+                  disabled={actionLoading}
+                  onClick={() =>
+                    setDeleteTarget(null)
+                  }
+                  className="flex-1 rounded-xl border border-white/[0.08] px-4 py-3 text-sm font-medium text-gray-300 hover:text-white hover:bg-white/[0.05] transition"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="button"
+                  disabled={actionLoading}
+                  onClick={confirmDelete}
+                  className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-red-500 px-4 py-3 text-sm font-semibold text-white hover:bg-red-400 transition disabled:opacity-50"
+                >
+                  {actionLoading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Deleting...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="w-4 h-4" />
+                      Delete
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
-          )}
+          </div>
         </div>
-      </Reveal>
-
-      {/* ======================================================
-          FORM MODAL
-      ====================================================== */}
-
-      {showForm && (
-        <TransactionForm
-          editing={editing}
-          onClose={() => {
-            setShowForm(false);
-            setEditing(null);
-          }}
-          onSave={handleSave}
-          saving={actionLoading}
-        />
       )}
-    </div>
+
+      {/* ========================================================
+          DELETE SUCCESS MODAL
+      ======================================================== */}
+
+      {deleteSuccess && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-md"
+            onClick={() =>
+              setDeleteSuccess(false)
+            }
+          />
+
+          <div className="relative w-full max-w-sm rounded-3xl border border-emerald-400/20 bg-[#101313] shadow-2xl p-7 text-center">
+            <div className="mx-auto w-16 h-16 rounded-full bg-emerald-400/10 border border-emerald-400/20 flex items-center justify-center">
+              <CheckCircle2 className="w-9 h-9 text-emerald-400" />
+            </div>
+
+            <h2 className="text-xl font-semibold text-white mt-5">
+              Transaction deleted
+            </h2>
+
+            <p className="text-sm text-gray-400 mt-2 leading-6">
+              This transaction has been
+              deleted successfully.
+            </p>
+
+            <button
+              type="button"
+              onClick={() =>
+                setDeleteSuccess(false)
+              }
+              className="mt-6 w-full rounded-xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-black hover:bg-emerald-400 transition"
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================
+          ERROR MODAL
+      ======================================================== */}
+
+      {errorMessage && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-md"
+            onClick={() =>
+              setErrorMessage(null)
+            }
+          />
+
+          <div className="relative w-full max-w-sm rounded-3xl border border-red-400/20 bg-[#101313] shadow-2xl p-7 text-center">
+            <div className="mx-auto w-16 h-16 rounded-full bg-red-400/10 border border-red-400/20 flex items-center justify-center">
+              <AlertCircle className="w-9 h-9 text-red-400" />
+            </div>
+
+            <h2 className="text-xl font-semibold text-white mt-5">
+              Something went wrong
+            </h2>
+
+            <p className="text-sm text-gray-400 mt-2 leading-6">
+              {errorMessage}
+            </p>
+
+            <button
+              type="button"
+              onClick={() =>
+                setErrorMessage(null)
+              }
+              className="mt-6 w-full rounded-xl bg-white/[0.08] border border-white/[0.08] px-4 py-3 text-sm font-semibold text-white hover:bg-white/[0.12] transition"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -1505,19 +1451,15 @@ function TransactionForm({
   saving,
 }: {
   editing: Transaction | null;
-
   onClose: () => void;
-
   onSave: (
     data: Transaction,
   ) => void;
-
   saving: boolean;
 }) {
   const [type, setType] =
     useState<TransactionType>(
-      editing?.type ||
-        "expense",
+      editing?.type || "expense",
     );
 
   const [amount, setAmount] =
@@ -1529,25 +1471,18 @@ function TransactionForm({
 
   const [category, setCategory] =
     useState(
-      editing?.category ||
-        "Other",
+      editing?.category || "Other",
     );
 
-  const [
-    description,
-    setDescription,
-  ] = useState(
-    editing?.description ||
-      "",
-  );
+  const [description, setDescription] =
+    useState(
+      editing?.description || "",
+    );
 
-  const [
-    merchant,
-    setMerchant,
-  ] = useState(
-    editing?.merchant ||
-      "",
-  );
+  const [merchant, setMerchant] =
+    useState(
+      editing?.merchant || "",
+    );
 
   const [date, setDate] =
     useState(
@@ -1557,18 +1492,14 @@ function TransactionForm({
           .split("T")[0],
     );
 
-  const [
-    isPredicting,
-    setIsPredicting,
-  ] = useState(false);
+  const [isPredicting, setIsPredicting] =
+    useState(false);
 
   const [
     predictionSource,
     setPredictionSource,
   ] = useState<
-    "automatic" |
-    "manual" |
-    "initial"
+    "automatic" | "manual" | "initial"
   >(
     editing
       ? "initial"
@@ -1577,62 +1508,41 @@ function TransactionForm({
 
   /* ==========================================================
      AUTOMATIC CATEGORY PREDICTION
-
-     IMPORTANT:
-     This now works for BOTH:
-     - Expense
-     - Income
   ========================================================== */
 
   useEffect(() => {
+    if (type !== "expense") {
+      return;
+    }
+
     const text =
       `${description} ${merchant}`.trim();
 
-    /*
-     * Don't predict when there isn't
-     * enough information.
-     */
     if (text.length < 2) {
-      setIsPredicting(false);
       return;
     }
 
     setIsPredicting(true);
 
-    /*
-     * Small delay makes the prediction
-     * feel like an ML prediction instead
-     * of changing instantly on every key.
-     */
     const timer =
-      window.setTimeout(
-        () => {
-          const predicted =
-            predictCategory(
-              description,
-              merchant,
-              type,
-            );
-
-          setCategory(
-            predicted,
+      window.setTimeout(() => {
+        const predicted =
+          predictCategory(
+            description,
+            merchant,
           );
 
-          setPredictionSource(
-            "automatic",
-          );
+        setCategory(predicted);
 
-          setIsPredicting(
-            false,
-          );
-        },
-        300,
-      );
+        setPredictionSource(
+          "automatic",
+        );
+
+        setIsPredicting(false);
+      }, 300);
 
     return () => {
-      window.clearTimeout(
-        timer,
-      );
+      window.clearTimeout(timer);
     };
   }, [
     description,
@@ -1672,50 +1582,28 @@ function TransactionForm({
       ) ||
       parsedAmount <= 0
     ) {
-      alert(
-        "Please enter a valid amount.",
-      );
-
       return;
     }
 
-    if (
-      !description.trim()
-    ) {
-      alert(
-        "Please enter a description.",
-      );
-
+    if (!description.trim()) {
       return;
     }
 
     if (!date) {
-      alert(
-        "Please select a date.",
-      );
-
       return;
     }
 
     onSave({
       id: editing?.id,
       _id: editing?._id,
-      userId:
-        editing?.userId,
-
+      userId: editing?.userId,
       type,
-
-      amount:
-        parsedAmount,
-
+      amount: parsedAmount,
       category,
-
       description:
         description.trim(),
-
       merchant:
         merchant.trim(),
-
       date,
     });
   }
@@ -1738,9 +1626,8 @@ function TransactionForm({
             </h2>
 
             <p className="text-xs text-gray-500 mt-1">
-              AI automatically
-              predicts the
-              category.
+              AI automatically predicts
+              the category.
             </p>
           </div>
 
@@ -1756,9 +1643,7 @@ function TransactionForm({
         {/* FORM */}
 
         <form
-          onSubmit={
-            handleSubmit
-          }
+          onSubmit={handleSubmit}
           className="p-5 space-y-5"
         >
           {/* TYPE */}
@@ -1772,13 +1657,10 @@ function TransactionForm({
               <button
                 type="button"
                 onClick={() =>
-                  setType(
-                    "expense",
-                  )
+                  setType("expense")
                 }
                 className={`rounded-xl border px-4 py-3 text-sm font-medium transition ${
-                  type ===
-                  "expense"
+                  type === "expense"
                     ? "border-red-400/40 bg-red-400/10 text-red-400"
                     : "border-white/[0.08] text-gray-500"
                 }`}
@@ -1789,13 +1671,10 @@ function TransactionForm({
               <button
                 type="button"
                 onClick={() =>
-                  setType(
-                    "income",
-                  )
+                  setType("income")
                 }
                 className={`rounded-xl border px-4 py-3 text-sm font-medium transition ${
-                  type ===
-                  "income"
+                  type === "income"
                     ? "border-emerald-400/40 bg-emerald-400/10 text-emerald-400"
                     : "border-white/[0.08] text-gray-500"
                 }`}
@@ -1819,8 +1698,7 @@ function TransactionForm({
               value={amount}
               onChange={(event) =>
                 setAmount(
-                  event.target
-                    .value,
+                  event.target.value,
                 )
               }
               placeholder="0.00"
@@ -1838,21 +1716,13 @@ function TransactionForm({
 
             <input
               type="text"
-              value={
-                description
-              }
+              value={description}
               onChange={(event) =>
                 setDescription(
-                  event.target
-                    .value,
+                  event.target.value,
                 )
               }
-              placeholder={
-                type ===
-                "income"
-                  ? "e.g. Salary, Freelance payment"
-                  : "e.g. Chocolate from supermarket"
-              }
+              placeholder="e.g. Chocolate from supermarket"
               className="w-full rounded-xl border border-white/[0.08] bg-black/20 px-4 py-3 text-sm text-white outline-none focus:border-emerald-400/40"
               required
             />
@@ -1870,55 +1740,47 @@ function TransactionForm({
               value={merchant}
               onChange={(event) =>
                 setMerchant(
-                  event.target
-                    .value,
+                  event.target.value,
                 )
               }
-              placeholder={
-                type ===
-                "income"
-                  ? "e.g. Company, Client, Platform"
-                  : "e.g. Amazon, Uber, Zomato"
-              }
+              placeholder="e.g. Amazon, Uber, Zomato"
               className="w-full rounded-xl border border-white/[0.08] bg-black/20 px-4 py-3 text-sm text-white outline-none focus:border-emerald-400/40"
             />
           </div>
 
-          {/* ==================================================
-              AI PREDICTION
-          ================================================== */}
+          {/* PREDICTION */}
 
-          {(description.trim()
-            .length >= 2 ||
-            merchant.trim()
-              .length >= 2) && (
-            <div className="flex items-center gap-3 rounded-xl border border-emerald-400/15 bg-emerald-400/[0.05] px-4 py-3">
-              {isPredicting ? (
-                <Loader2 className="w-4 h-4 text-emerald-400 animate-spin" />
-              ) : (
-                <Sparkles className="w-4 h-4 text-emerald-400" />
-              )}
-
-              <div>
-                <p className="text-xs font-medium text-emerald-400">
-                  {isPredicting
-                    ? "Predicting category..."
-                    : predictionSource ===
-                        "manual"
-                      ? `Category selected: ${category}`
-                      : `ML predicted: ${category}`}
-                </p>
-
-                {!isPredicting && (
-                  <p className="text-[11px] text-gray-500 mt-0.5">
-                    Based on
-                    description
-                    and merchant
-                  </p>
+          {type === "expense" &&
+            (description.trim()
+              .length >= 2 ||
+              merchant.trim()
+                .length >= 2) && (
+              <div className="flex items-center gap-3 rounded-xl border border-emerald-400/15 bg-emerald-400/[0.05] px-4 py-3">
+                {isPredicting ? (
+                  <Loader2 className="w-4 h-4 text-emerald-400 animate-spin" />
+                ) : (
+                  <Sparkles className="w-4 h-4 text-emerald-400" />
                 )}
+
+                <div>
+                  <p className="text-xs font-medium text-emerald-400">
+                    {isPredicting
+                      ? "Predicting category..."
+                      : predictionSource ===
+                          "manual"
+                        ? `Category selected: ${category}`
+                        : `ML predicted: ${category}`}
+                  </p>
+
+                  {!isPredicting && (
+                    <p className="text-[11px] text-gray-500 mt-0.5">
+                      Based on description
+                      and merchant
+                    </p>
+                  )}
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
           {/* CATEGORY */}
 
@@ -1928,13 +1790,10 @@ function TransactionForm({
             </label>
 
             <select
-              value={
-                category
-              }
+              value={category}
               onChange={(event) =>
                 handleManualCategoryChange(
-                  event.target
-                    .value,
+                  event.target.value,
                 )
               }
               className="w-full rounded-xl border border-white/[0.08] bg-black/20 px-4 py-3 text-sm text-white outline-none focus:border-emerald-400/40"
@@ -1964,8 +1823,7 @@ function TransactionForm({
               value={date}
               onChange={(event) =>
                 setDate(
-                  event.target
-                    .value,
+                  event.target.value,
                 )
               }
               className="w-full rounded-xl border border-white/[0.08] bg-black/20 px-4 py-3 text-sm text-white outline-none focus:border-emerald-400/40"
@@ -1978,12 +1836,8 @@ function TransactionForm({
           <div className="flex gap-3 pt-2">
             <button
               type="button"
-              onClick={
-                onClose
-              }
-              disabled={
-                saving
-              }
+              onClick={onClose}
+              disabled={saving}
               className="flex-1 rounded-xl border border-white/[0.08] px-4 py-3 text-sm font-medium text-gray-400 hover:text-white hover:bg-white/[0.04]"
             >
               Cancel
@@ -1991,9 +1845,7 @@ function TransactionForm({
 
             <button
               type="submit"
-              disabled={
-                saving
-              }
+              disabled={saving}
               className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-black hover:bg-emerald-400 disabled:opacity-50"
             >
               {saving && (
@@ -2008,5 +1860,5 @@ function TransactionForm({
         </form>
       </div>
     </div>
-  );
+  )
 }
