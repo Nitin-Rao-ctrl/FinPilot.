@@ -1860,5 +1860,5 @@ function TransactionForm({
         </form>
       </div>
     </div>
-  )
+  );
 }
