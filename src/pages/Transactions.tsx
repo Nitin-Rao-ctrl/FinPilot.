@@ -80,6 +80,12 @@ const CATEGORIES = [
   "Rent",
   "Subscription",
   "Personal",
+  "Salary",
+  "Freelance",
+  "Business",
+  "Investment",
+  "Gift",
+  "Refund",
   "Other",
 ];
 
@@ -308,6 +314,119 @@ const CATEGORY_RULES: Record<string, string[]> = {
     "spa",
   ],
 };
+
+/* ============================================================
+   INCOME CATEGORY RULES
+============================================================ */
+
+const INCOME_CATEGORY_RULES: Record<string, string[]> = {
+  Salary: [
+    "salary",
+    "payroll",
+    "pay check",
+    "paycheck",
+    "monthly salary",
+    "wages",
+    "wage",
+    "ctc",
+    "compensation",
+  ],
+
+  Freelance: [
+    "freelance",
+    "freelancing",
+    "client payment",
+    "client",
+    "project payment",
+    "project income",
+    "contract work",
+    "contractor",
+    "upwork",
+    "fiverr",
+  ],
+
+  Business: [
+    "business",
+    "sales",
+    "sale",
+    "revenue",
+    "profit",
+    "commission",
+    "shop income",
+    "store income",
+  ],
+
+  Investment: [
+    "investment",
+    "dividend",
+    "dividends",
+    "interest",
+    "mutual fund",
+    "mutual funds",
+    "stock profit",
+    "stocks",
+    "capital gain",
+    "capital gains",
+  ],
+
+  Gift: [
+    "gift",
+    "birthday gift",
+    "cash gift",
+    "present",
+  ],
+
+  Refund: [
+    "refund",
+    "cashback",
+    "cash back",
+    "reimbursement",
+    "reimburse",
+    "returned payment",
+  ],
+};
+
+/* ============================================================
+   INCOME CATEGORY PREDICTOR
+============================================================ */
+
+function predictIncomeCategory(
+  description: string,
+  merchant: string,
+): string {
+  const text = normalizeText(
+    `${description} ${merchant}`,
+  );
+
+  if (!text) {
+    return "Other";
+  }
+
+  const priority = [
+    "Salary",
+    "Freelance",
+    "Business",
+    "Investment",
+    "Gift",
+    "Refund",
+  ];
+
+  for (const category of priority) {
+    const keywords =
+      INCOME_CATEGORY_RULES[category] || [];
+
+    const matched = keywords.some(
+      (keyword) =>
+        keywordMatches(text, keyword),
+    );
+
+    if (matched) {
+      return category;
+    }
+  }
+
+  return "Other";
+}
 
 /* ============================================================
    NORMALIZE TEXT
@@ -1511,7 +1630,7 @@ function TransactionForm({
   ========================================================== */
 
   useEffect(() => {
-    if (type !== "expense") {
+    if (type !== "expense" && type !== "income") {
       return;
     }
 
@@ -1527,10 +1646,15 @@ function TransactionForm({
     const timer =
       window.setTimeout(() => {
         const predicted =
-          predictCategory(
-            description,
-            merchant,
-          );
+          type === "income"
+            ? predictIncomeCategory(
+                description,
+                merchant,
+              )
+            : predictCategory(
+                description,
+                merchant,
+              );
 
         setCategory(predicted);
 
@@ -1750,11 +1874,9 @@ function TransactionForm({
 
           {/* PREDICTION */}
 
-          {type === "expense" &&
-            (description.trim()
-              .length >= 2 ||
-              merchant.trim()
-                .length >= 2) && (
+          {((type === "expense" || type === "income") &&
+  (description.trim().length >= 2 ||
+   merchant.trim().length >= 2)) && (
               <div className="flex items-center gap-3 rounded-xl border border-emerald-400/15 bg-emerald-400/[0.05] px-4 py-3">
                 {isPredicting ? (
                   <Loader2 className="w-4 h-4 text-emerald-400 animate-spin" />
