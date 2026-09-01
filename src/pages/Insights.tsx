@@ -217,13 +217,117 @@ const [showCategoryAnalysis, setShowCategoryAnalysis] =
             )
         )
       : 0;
+      
 
   // -----------------------------
   // MONEY LEAKS
   // -----------------------------
+ // -----------------------------
+// SMART REDUCTION ANALYSIS
+// -----------------------------
 
-  const moneyLeaks = categoryBreakdown
-    .filter((cat) => cat.total > 0)
+const fixedCategories = [
+  'Rent',
+  'EMI',
+  'Loan',
+  'Insurance',
+];
+
+function getRecommendedReduction(
+  category: string,
+  total: number,
+  transactionCount: number,
+  totalExpense: number
+) {
+  if (
+    total <= 0 ||
+    totalExpense <= 0 ||
+    fixedCategories.includes(category)
+  ) {
+    return 0;
+  }
+
+  const share = total / totalExpense;
+
+  if (
+    transactionCount >= 5 &&
+    share >= 0.20
+  ) {
+    return 25;
+  }
+
+  if (
+    transactionCount >= 3 &&
+    share >= 0.15
+  ) {
+    return 20;
+  }
+
+  if (share >= 0.30) {
+    return 20;
+  }
+
+  if (share >= 0.15) {
+    return 15;
+  }
+
+  return 10;
+}
+ const moneyLeaks = categoryBreakdown
+  .filter(
+    (cat) =>
+      cat.total > 0 &&
+      !fixedCategories.includes(cat.category)
+  )
+  .slice(0, 3)
+  .map((cat) => {
+    const categoryTransactions =
+      expenses.filter(
+        (t) =>
+          (t.category || 'Other') ===
+          cat.category
+      );
+
+    const recommendedReduction =
+      getRecommendedReduction(
+        cat.category,
+        cat.total,
+        categoryTransactions.length,
+        totalExpense
+      );
+
+    return {
+      count: categoryTransactions.length,
+      category: cat.category,
+      merchant: cat.category,
+      total: cat.total,
+      average: Math.round(
+        cat.total /
+          Math.max(
+            1,
+            categoryTransactions.length
+          )
+      ),
+      reductionPercent: recommendedReduction,
+      potentialSavings: Math.round(
+        cat.total *
+          recommendedReduction /
+          100
+      ),
+    };
+  });
+
+  // -----------------------------
+  // SAVING SUGGESTIONS
+  // -----------------------------
+
+ const savingSuggestions =
+  categoryBreakdown
+    .filter(
+      (cat) =>
+        cat.total > 0 &&
+        !fixedCategories.includes(cat.category)
+    )
     .slice(0, 3)
     .map((cat) => {
       const categoryTransactions =
@@ -233,40 +337,28 @@ const [showCategoryAnalysis, setShowCategoryAnalysis] =
             cat.category
         );
 
+      const reductionPercent =
+        getRecommendedReduction(
+          cat.category,
+          cat.total,
+          categoryTransactions.length,
+          totalExpense
+        );
+
+      const potentialSavings =
+        Math.round(
+          cat.total *
+            reductionPercent /
+            100
+        );
+
       return {
-        count: categoryTransactions.length,
         category: cat.category,
-        merchant: cat.category,
-        total: cat.total,
-        average: Math.round(
-          cat.total /
-            Math.max(
-              1,
-              categoryTransactions.length
-            )
-        ),
-        potentialSavings: Math.round(
-          cat.total * 0.2
-        ),
+        reductionPercent,
+        potentialSavings,
+        advice: `Based on your spending pattern, reducing ${cat.category} spending by ${reductionPercent}% could save approximately ₹${potentialSavings} per month.`,
       };
     });
-
-  // -----------------------------
-  // SAVING SUGGESTIONS
-  // -----------------------------
-
-  const savingSuggestions =
-    categoryBreakdown
-      .slice(0, 3)
-      .map((cat) => ({
-        category: cat.category,
-        potentialSavings: Math.round(
-          cat.total * 0.2
-        ),
-        advice: `Reducing ${cat.category} spending by 20% could save approximately ₹${Math.round(
-          cat.total * 0.2
-        )} per month.`,
-      }));
 
   // -----------------------------
   // INSIGHTS
@@ -845,7 +937,7 @@ const [showCategoryAnalysis, setShowCategoryAnalysis] =
                       </p>
 
                       <p className="text-xs text-emerald-400 mt-1.5">
-                        Reduce by 20% to save ₹
+                        Reduce by {leak.reductionPercent}% to save ₹
                         {leak.potentialSavings.toLocaleString(
                           'en-IN'
                         )}
@@ -894,7 +986,7 @@ const [showCategoryAnalysis, setShowCategoryAnalysis] =
                     </span>
 
                     <span className="text-[10px] font-semibold text-emerald-400 bg-emerald-400/10 px-2 py-1 rounded-full">
-                      Save Up To
+                      Save Up To 
                       {s.potentialSavings.toLocaleString(
                         'en-IN'
                       )}
