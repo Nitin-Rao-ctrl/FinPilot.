@@ -286,7 +286,7 @@ export function InsightsPage() {
       ]
     : [];
 
-  // -----------------------------
+   // -----------------------------
   // FINANCIAL HEALTH
   // -----------------------------
 
@@ -306,34 +306,30 @@ export function InsightsPage() {
       : 0;
 
   const budgetControl =
-    totalExpense > 0
+    totalIncome > 0
       ? Math.max(
           0,
           Math.min(
             100,
             Math.round(
-              100 -
-                (totalExpense /
-                  Math.max(
-                    totalIncome,
-                    totalExpense
-                  )) *
-                  100
+              (1 -
+                totalExpense /
+                  totalIncome) *
+                100
             )
           )
         )
       : 0;
 
   const spendingBehavior =
-    expenses.length > 0 ? 75 : 0;
+    transactions.length > 0 ? 80 : 0;
 
   const healthScore = Math.round(
-    (savingsRate +
-      budgetControl +
+    (Math.max(0, savingsRate) +
+      Math.max(0, budgetControl) +
       spendingBehavior) /
       3
   );
-
   return (
     <div className="space-y-6">
 
