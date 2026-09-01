@@ -14,6 +14,10 @@ import {
 
 import { Reveal } from '@/lib/animations';
 import { supabase } from '@/lib/supabase';
+import {
+  MonthSelector,
+  type SelectedPeriod,
+} from '@/components/MonthSelector';
 
 type Category =
   | 'Food'
@@ -73,58 +77,6 @@ const CATEGORIES: Category[] = [
   'Other',
 ];
 
-function isCurrentMonth(dateValue: string) {
-  const date = new Date(dateValue);
-  const now = new Date();
-
-  return (
-    date.getFullYear() ===
-      now.getFullYear() &&
-    date.getMonth() === now.getMonth()
-  );
-}
-
-function readSavedBudget() {
-  const stored =
-    localStorage.getItem(
-      'smartspend_budget'
-    );
-
-  if (!stored) {
-    return 0;
-  }
-
-  try {
-    const parsed =
-      JSON.parse(stored);
-
-    if (
-      typeof parsed === 'number'
-    ) {
-      return parsed;
-    }
-
-    if (
-      parsed &&
-      typeof parsed.totalBudget ===
-        'number'
-    ) {
-      return parsed.totalBudget;
-    }
-
-    if (
-      parsed &&
-      typeof parsed.amount ===
-        'number'
-    ) {
-      return parsed.amount;
-    }
-
-    return 0;
-  } catch {
-    return 0;
-  }
-}
 
 function getCurrentBalance(
   transactions: Transaction[]
@@ -152,18 +104,40 @@ function getCurrentBalance(
   );
 }
 
-function getCurrentMonthSpent(
+function getPeriodTransactions(
+  transactions: Transaction[],
+  period: SelectedPeriod
+) {
+  if (period.type === 'all') {
+    return transactions;
+  }
+
+  return transactions.filter((transaction) => {
+    if (!transaction.date) return false;
+
+    const date = new Date(transaction.date);
+
+    if (Number.isNaN(date.getTime())) {
+      return false;
+    }
+
+    if (period.type !== 'month') {
+      return false;
+    }
+
+    return (
+      date.getFullYear() === period.year &&
+      date.getMonth() === period.month
+    );
+  });
+}
+
+function getPeriodSpent(
   transactions: Transaction[]
 ) {
   return transactions.reduce(
     (total, transaction) => {
-      if (
-        transaction.type !==
-          'expense' ||
-        !isCurrentMonth(
-          transaction.date
-        )
-      ) {
+      if (transaction.type !== 'expense') {
         return total;
       }
 
@@ -173,9 +147,7 @@ function getCurrentMonthSpent(
 
       return (
         total +
-        (Number.isFinite(amount)
-          ? amount
-          : 0)
+        (Number.isFinite(amount) ? amount : 0)
       );
     },
     0
@@ -189,19 +161,8 @@ function getCategorySpent(
   return transactions.reduce(
     (total, transaction) => {
       if (
-        transaction.type !==
-          'expense' ||
-        !isCurrentMonth(
-          transaction.date
-        )
-      ) {
-        return total;
-      }
-
-      if (
-        (transaction.category ||
-          'Other') !==
-        category
+        transaction.type !== 'expense' ||
+        (transaction.category || 'Other') !== category
       ) {
         return total;
       }
@@ -212,9 +173,7 @@ function getCategorySpent(
 
       return (
         total +
-        (Number.isFinite(amount)
-          ? amount
-          : 0)
+        (Number.isFinite(amount) ? amount : 0)
       );
     },
     0
@@ -239,8 +198,45 @@ export function AskPage() {
   const [transactions, setTransactions] =
     useState<Transaction[]>([]);
 
-  const [monthlyBudget, setMonthlyBudget] =
-    useState(0);
+  const [selectedPeriod, setSelectedPeriod] =
+    useState<SelectedPeriod>(() => {
+      try {
+        const saved = localStorage.getItem(
+          'finpilot_selected_period'
+        );
+
+        if (saved) {
+          const parsed = JSON.parse(saved);
+
+          if (parsed?.type === 'all') {
+            return { type: 'all' };
+          }
+
+          if (
+            parsed?.type === 'month' &&
+            typeof parsed.year === 'number' &&
+            typeof parsed.month === 'number'
+          ) {
+            return {
+              type: 'month',
+              year: parsed.year,
+              month: parsed.month,
+            };
+          }
+        }
+      } catch {
+        // Ignore invalid saved period
+      }
+
+      const now = new Date();
+
+      return {
+        type: 'month',
+        year: now.getFullYear(),
+        month: now.getMonth(),
+      };
+    });
+
 
   const [loadingData, setLoadingData] =
     useState(true);
@@ -282,10 +278,6 @@ const response = await fetch(
           ? data
           : []
       );
-
-      setMonthlyBudget(
-        readSavedBudget()
-      );
     } catch (error) {
       console.error(
         'Failed to load financial data:',
@@ -297,9 +289,6 @@ const response = await fetch(
       );
 
       setTransactions([]);
-      setMonthlyBudget(
-        readSavedBudget()
-      );
     } finally {
       setLoadingData(false);
     }
@@ -307,26 +296,14 @@ const response = await fetch(
 
   useEffect(() => {
     loadFinancialData();
-
-    const handleBudgetChange =
-      () => {
-        setMonthlyBudget(
-          readSavedBudget()
-        );
-      };
-
-    window.addEventListener(
-      'storage',
-      handleBudgetChange
-    );
-
-    return () => {
-      window.removeEventListener(
-        'storage',
-        handleBudgetChange
-      );
-    };
   }, []);
+
+  useEffect(() => {
+    localStorage.setItem(
+      'finpilot_selected_period',
+      JSON.stringify(selectedPeriod)
+    );
+  }, [selectedPeriod]);
 
   function handleAnalyze() {
     const purchaseAmount =
@@ -340,145 +317,160 @@ const response = await fetch(
       return;
     }
 
-    const currentBalance =
-      getCurrentBalance(
-        transactions
+    const periodTransactions =
+      getPeriodTransactions(
+        transactions,
+        selectedPeriod
       );
 
-    const currentMonthSpent =
-      getCurrentMonthSpent(
-        transactions
+    const currentBalance =
+      getCurrentBalance(
+        periodTransactions
+      );
+
+    const currentPeriodSpent =
+      getPeriodSpent(
+        periodTransactions
       );
 
     const categorySpent =
       getCategorySpent(
-        transactions,
+        periodTransactions,
         category
       );
 
-    const budget =
-      monthlyBudget;
+    const periodIncome =
+      periodTransactions
+        .filter(
+          (transaction) =>
+            transaction.type === 'income'
+        )
+        .reduce(
+          (sum, transaction) =>
+            sum +
+            Number(
+              transaction.amount || 0
+            ),
+          0
+        );
 
     const afterPurchase =
       currentBalance -
       purchaseAmount;
 
-    const budgetRemaining =
-      budget > 0
-        ? budget -
-          currentMonthSpent -
-          purchaseAmount
+    const daysInPeriod =
+      selectedPeriod.type === 'month'
+        ? new Date(
+            selectedPeriod.year,
+            selectedPeriod.month + 1,
+            0
+          ).getDate()
+        : 30;
+
+    const dailyAvailable =
+      periodIncome > 0
+        ? Math.max(
+            0,
+            (periodIncome -
+              currentPeriodSpent) /
+              Math.max(1, daysInPeriod)
+          )
         : 0;
 
-    /*
-      We assume roughly 30 days for
-      a simple daily spending guideline.
-    */
-    const dailyLimit =
-      budget > 0
-        ? budget / 30
-        : 0;
+    const savingsAfterPurchase =
+      periodIncome -
+      currentPeriodSpent -
+      purchaseAmount;
 
-    const budgetUtilization =
-      budget > 0
+    const incomeUsed =
+      periodIncome > 0
         ? Math.min(
             100,
-            ((currentMonthSpent +
+            ((currentPeriodSpent +
               purchaseAmount) /
-              budget) *
+              periodIncome) *
               100
           )
         : 0;
 
     const categoryPercentage =
-      budget > 0
+      periodIncome > 0
         ? Math.min(
             100,
             ((categorySpent +
               purchaseAmount) /
-              budget) *
+              periodIncome) *
               100
           )
         : 0;
 
     const warnings: string[] = [];
 
-    /* ======================================================
-       WARNINGS
-    ====================================================== */
-
     if (
-      budget > 0 &&
-      purchaseAmount >
-        dailyLimit
+      dailyAvailable > 0 &&
+      purchaseAmount > dailyAvailable
     ) {
       warnings.push(
         `This purchase is ₹${Math.round(
           purchaseAmount -
-            dailyLimit
+            dailyAvailable
         ).toLocaleString(
           'en-IN'
-        )} above your approximate daily budget limit.`
+        )} above the amount currently available per day based on this period's income and spending.`
       );
     }
 
     if (
-      budget > 0 &&
-      budgetRemaining < 0
+      periodIncome > 0 &&
+      savingsAfterPurchase < 0
     ) {
       warnings.push(
-        `This purchase would push your monthly spending ₹${Math.abs(
-          budgetRemaining
+        `This purchase would push this period's spending above its recorded income by ₹${Math.abs(
+          savingsAfterPurchase
         ).toLocaleString(
           'en-IN'
-        )} over budget.`
+        )}.`
       );
     } else if (
-      budget > 0 &&
-      budgetRemaining <
-        budget * 0.1
+      periodIncome > 0 &&
+      savingsAfterPurchase <
+        periodIncome * 0.1
     ) {
       warnings.push(
-        `Only ₹${budgetRemaining.toLocaleString(
+        `Only ₹${Math.max(
+          0,
+          savingsAfterPurchase
+        ).toLocaleString(
           'en-IN'
-        )} of your monthly budget would remain.`
+        )} would remain as savings after this purchase.`
       );
     }
 
     if (
-      budget > 0 &&
-      categoryPercentage >
-        40
+      periodIncome > 0 &&
+      categoryPercentage > 40
     ) {
       warnings.push(
-        `${category} spending would become ${Math.round(
+        `${category} would represent approximately ${Math.round(
           categoryPercentage
-        )}% of your monthly budget.`
+        )}% of this period's recorded income after this purchase.`
       );
     }
 
-    if (
-      currentBalance <=
-      0
-    ) {
+    if (currentBalance <= 0) {
       warnings.push(
-        'Your current balance is not positive.'
+        'Your selected period balance is not positive.'
       );
     } else if (
       purchaseAmount >
       currentBalance
     ) {
       warnings.push(
-        'You do not currently have enough balance for this purchase.'
+        'You do not currently have enough available balance for this purchase.'
       );
     }
 
-    /* ======================================================
-       STATUS
-    ====================================================== */
-
-    let status:
-      | Analysis['status'] =
+    let status: Analysis['status'] =
       'GOOD';
 
     let goalImpact:
@@ -486,9 +478,8 @@ const response = await fetch(
       'LOW';
 
     if (
-      currentBalance <=
-        0 &&
-      budget <= 0
+      currentBalance <= 0 &&
+      periodIncome <= 0
     ) {
       status = 'CAUTION';
       goalImpact = 'MODERATE';
@@ -498,15 +489,13 @@ const response = await fetch(
     ) {
       status =
         'NOT RECOMMENDED';
-
       goalImpact = 'HIGH';
     } else if (
-      budget > 0 &&
-      budgetRemaining < 0
+      periodIncome > 0 &&
+      savingsAfterPurchase < 0
     ) {
       status =
         'NOT RECOMMENDED';
-
       goalImpact = 'HIGH';
     } else if (
       warnings.length >= 2
@@ -520,21 +509,16 @@ const response = await fetch(
       goalImpact = 'LOW';
     }
 
-    /* ======================================================
-       MESSAGE
-    ====================================================== */
-
     let message = '';
 
     if (
-      currentBalance <=
-        0 &&
-      budget <= 0
+      currentBalance <= 0 &&
+      periodIncome <= 0
     ) {
       message =
         `You are planning to spend ₹${purchaseAmount.toLocaleString(
           'en-IN'
-        )} on ${category.toLowerCase()}, but FinPilot does not have enough financial data to give a reliable recommendation yet. Set a monthly budget and add income/expense transactions.`;
+        )} on ${category.toLowerCase()}, but there is not enough recorded financial data in the selected period to give a reliable recommendation yet. Add income and expense transactions first.`;
     } else if (
       purchaseAmount >
       currentBalance
@@ -542,45 +526,40 @@ const response = await fetch(
       message =
         `This ₹${purchaseAmount.toLocaleString(
           'en-IN'
-        )} purchase is larger than your current available balance of ₹${currentBalance.toLocaleString(
+        )} purchase is larger than your available balance of ₹${currentBalance.toLocaleString(
           'en-IN'
         )}. It is not recommended right now.`;
     } else if (
-      budget > 0 &&
-      budgetRemaining < 0
+      periodIncome > 0 &&
+      savingsAfterPurchase < 0
     ) {
       message =
-        `This purchase would take your monthly spending over budget. You would exceed your ₹${budget.toLocaleString(
-          'en-IN'
-        )} budget by ₹${Math.abs(
-          budgetRemaining
-        ).toLocaleString(
-          'en-IN'
-        )}.`;
+        `This purchase would consume more than the remaining savings available from the selected period's recorded income.`;
     } else if (
       warnings.length > 0
     ) {
       message =
         `You can afford this ₹${purchaseAmount.toLocaleString(
           'en-IN'
-        )} purchase, but it deserves some caution based on your current spending and budget.`;
+        )} purchase, but it deserves some caution based on your selected period's spending pattern.`;
     } else {
       message =
         `This ₹${purchaseAmount.toLocaleString(
           'en-IN'
-        )} purchase appears manageable based on your current balance and monthly budget.`;
+        )} purchase appears manageable based on your selected period's recorded income, spending and available balance.`;
     }
 
     setAnalysis({
       currentBalance,
       afterPurchase,
-      dailyLimit,
-      proposed:
-        purchaseAmount,
-      budgetUtilization,
+      dailyLimit: dailyAvailable,
+      proposed: purchaseAmount,
+      budgetUtilization: incomeUsed,
       categoryPercentage,
-      budgetRemaining,
-      currentMonthSpent,
+      budgetRemaining:
+        Math.max(0, savingsAfterPurchase),
+      currentMonthSpent:
+        currentPeriodSpent,
       goalImpact,
       status,
       message,
@@ -618,11 +597,19 @@ const response = await fetch(
 
           </div>
 
-          <button
-            type="button"
-            onClick={
-              loadFinancialData
-            }
+          <div className="flex items-center gap-3">
+            <MonthSelector
+              value={selectedPeriod}
+              onChange={(period) =>
+                setSelectedPeriod(period)
+              }
+            />
+
+            <button
+              type="button"
+              onClick={
+                loadFinancialData
+              }
             disabled={
               loadingData
             }
@@ -638,8 +625,8 @@ const response = await fetch(
             />
 
             Refresh
-
-          </button>
+            </button>
+          </div>
 
         </div>
 
@@ -673,51 +660,80 @@ const response = await fetch(
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
 
           <SummaryCard
-            label="Current Balance"
+            label="Available Balance"
             value={`₹${getCurrentBalance(
-              transactions
+              getPeriodTransactions(
+                transactions,
+                selectedPeriod
+              )
             ).toLocaleString(
               'en-IN'
             )}`}
           />
 
           <SummaryCard
-            label="This Month Spent"
-            value={`₹${getCurrentMonthSpent(
-              transactions
+            label="Period Spent"
+            value={`₹${getPeriodSpent(
+              getPeriodTransactions(
+                transactions,
+                selectedPeriod
+              )
             ).toLocaleString(
               'en-IN'
             )}`}
           />
 
           <SummaryCard
-            label="Monthly Budget"
-            value={
-              monthlyBudget >
-              0
-                ? `₹${monthlyBudget.toLocaleString(
-                    'en-IN'
-                  )}`
-                : 'Not set'
-            }
+            label="Period Income"
+            value={`₹${getPeriodTransactions(
+              transactions,
+              selectedPeriod
+            )
+              .filter(
+                (transaction) =>
+                  transaction.type === 'income'
+              )
+              .reduce(
+                (sum, transaction) =>
+                  sum +
+                  Number(
+                    transaction.amount || 0
+                  ),
+                0
+              )
+              .toLocaleString(
+                'en-IN'
+              )}`}
           />
 
           <SummaryCard
-            label="Budget Left"
-            value={
-              monthlyBudget >
-              0
-                ? `₹${Math.max(
-                    0,
-                    monthlyBudget -
-                      getCurrentMonthSpent(
-                        transactions
-                      )
-                  ).toLocaleString(
-                    'en-IN'
-                  )}`
-                : 'Not set'
-            }
+            label="Period Savings"
+            value={`₹${(
+              getPeriodTransactions(
+                transactions,
+                selectedPeriod
+              )
+                .filter(
+                  (transaction) =>
+                    transaction.type === 'income'
+                )
+                .reduce(
+                  (sum, transaction) =>
+                    sum +
+                    Number(
+                      transaction.amount || 0
+                    ),
+                  0
+                ) -
+              getPeriodSpent(
+                getPeriodTransactions(
+                  transactions,
+                  selectedPeriod
+                )
+              )
+            ).toLocaleString(
+              'en-IN'
+            )}`}
           />
 
         </div>
@@ -954,15 +970,8 @@ const response = await fetch(
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
 
               <MetricBox
-                label="Budget Utilization"
-                value={
-                  monthlyBudget >
-                  0
-                    ? `${analysis.budgetUtilization.toFixed(
-                        1
-                      )}%`
-                    : 'N/A'
-                }
+                label="Income Used"
+                value={`${analysis.budgetUtilization.toFixed(1)}%`}
                 warning={
                   analysis.budgetUtilization >
                   80
@@ -970,15 +979,8 @@ const response = await fetch(
               />
 
               <MetricBox
-                label="Category %"
-                value={
-                  monthlyBudget >
-                  0
-                    ? `${Math.round(
-                        analysis.categoryPercentage
-                      )}%`
-                    : 'N/A'
-                }
+                label="Category Share"
+                value={`${Math.round(analysis.categoryPercentage)}%`}
                 warning={
                   analysis.categoryPercentage >
                   40
@@ -986,24 +988,9 @@ const response = await fetch(
               />
 
               <MetricBox
-                label="Budget Remaining"
-                value={
-                  monthlyBudget >
-                  0
-                    ? `₹${Math.max(
-                        0,
-                        analysis.budgetRemaining
-                      ).toLocaleString(
-                        'en-IN'
-                      )}`
-                    : 'N/A'
-                }
-                warning={
-                  monthlyBudget >
-                    0 &&
-                  analysis.budgetRemaining <
-                    0
-                }
+                label="Savings After Purchase"
+                value={`₹${analysis.budgetRemaining.toLocaleString('en-IN')}`}
+                warning={analysis.budgetRemaining <= 0}
               />
 
               <MetricBox
@@ -1288,7 +1275,7 @@ function AnalysisResult({
         </span>
 
         <span>
-          This month:{' '}
+          Selected period:{' '}
           <span className="text-gray-400">
             ₹
             {analysis.currentMonthSpent.toLocaleString(

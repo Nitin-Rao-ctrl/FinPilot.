@@ -27,6 +27,10 @@ import {
 import { useEffect, useState } from 'react';
 import { Reveal, CountUp } from '@/lib/animations';
 import { supabase } from '@/lib/supabase';
+import {
+  MonthSelector,
+  type SelectedPeriod,
+} from '@/components/MonthSelector';
 
 const PIE_COLORS = [
   '#00FF88',
@@ -39,9 +43,56 @@ const PIE_COLORS = [
 
 export function InsightsPage() {
   const [transactions, setTransactions] = useState<any[]>([]);
-const [showCategoryAnalysis, setShowCategoryAnalysis] =
-  useState(false);
- useEffect(() => {
+  const [showCategoryAnalysis, setShowCategoryAnalysis] =
+    useState(false);
+
+  const [selectedPeriod, setSelectedPeriod] =
+    useState<SelectedPeriod>(() => {
+      try {
+        const saved = localStorage.getItem(
+          'finpilot_selected_period'
+        );
+
+        if (saved) {
+          const parsed = JSON.parse(saved);
+
+          if (parsed?.type === 'all') {
+            return { type: 'all' };
+          }
+
+          if (
+            parsed?.type === 'month' &&
+            typeof parsed.year === 'number' &&
+            typeof parsed.month === 'number'
+          ) {
+            return {
+              type: 'month',
+              year: parsed.year,
+              month: parsed.month,
+            };
+          }
+        }
+      } catch {
+        // Ignore invalid saved period
+      }
+
+      const now = new Date();
+
+      return {
+        type: 'month',
+        year: now.getFullYear(),
+        month: now.getMonth(),
+      };
+    });
+
+  useEffect(() => {
+    localStorage.setItem(
+      'finpilot_selected_period',
+      JSON.stringify(selectedPeriod)
+    );
+  }, [selectedPeriod]);
+
+  useEffect(() => {
   async function loadTransactions() {
     try {
       const {
@@ -84,14 +135,40 @@ const [showCategoryAnalysis, setShowCategoryAnalysis] =
 }, []);
 
   // -----------------------------
+  // SELECTED PERIOD
+  // -----------------------------
+
+  const periodTransactions =
+    selectedPeriod.type === 'all'
+      ? transactions
+      : transactions.filter((t) => {
+          if (!t.date) return false;
+
+          const date = new Date(t.date);
+
+          if (Number.isNaN(date.getTime())) {
+            return false;
+          }
+
+          if (selectedPeriod.type !== 'month') {
+            return false;
+          }
+
+          return (
+            date.getFullYear() === selectedPeriod.year &&
+            date.getMonth() === selectedPeriod.month
+          );
+        });
+
+  // -----------------------------
   // TRANSACTIONS
   // -----------------------------
 
-  const expenses = transactions.filter(
+  const expenses = periodTransactions.filter(
     (t) => t.type === 'expense'
   );
 
-  const incomes = transactions.filter(
+  const incomes = periodTransactions.filter(
     (t) => t.type === 'income'
   );
 
@@ -383,7 +460,7 @@ function getRecommendedReduction(
         {
           type: 'positive',
           title: 'Keep tracking your expenses',
-          detail: `You have logged ${transactions.length} transactions.`,
+          detail: `You have logged ${periodTransactions.length} transactions.`,
         },
       ]
     : [];
@@ -423,8 +500,255 @@ function getRecommendedReduction(
         )
       : 0;
 
-  const spendingBehavior =
-    transactions.length > 0 ? 80 : 0;
+  /* ============================================================
+     SPENDING BEHAVIOR ANALYSIS
+     Based on the selected period's actual transactions.
+
+     1. Consistency (40%)
+        Measures how stable daily spending is.
+     2. Trend (35%)
+        Compares earlier spending with more recent spending.
+        Lower recent spending = better behavior.
+     3. Large spending (25%)
+        Detects unusually large individual transactions.
+  ============================================================ */
+
+  const behaviorTransactions =
+    periodTransactions.filter(
+      (transaction) =>
+        transaction.type === 'expense' &&
+        Number(transaction.amount || 0) > 0 &&
+        transaction.date
+    );
+
+  let spendingBehavior = 0;
+
+  if (behaviorTransactions.length > 0) {
+    /* ------------------------------------------------------------
+       1. SPENDING CONSISTENCY
+    ------------------------------------------------------------ */
+
+    const dailySpending: Record<string, number> = {};
+
+    behaviorTransactions.forEach((transaction) => {
+      const date = new Date(transaction.date);
+
+      if (Number.isNaN(date.getTime())) {
+        return;
+      }
+
+      const dayKey = date.toISOString().split('T')[0];
+
+      dailySpending[dayKey] =
+        (dailySpending[dayKey] || 0) +
+        Number(transaction.amount || 0);
+    });
+
+    const dailyAmounts =
+      Object.values(dailySpending);
+
+    let consistencyScore = 50;
+
+    if (dailyAmounts.length >= 2) {
+      const average =
+        dailyAmounts.reduce(
+          (sum, value) => sum + value,
+          0
+        ) / dailyAmounts.length;
+
+      const variance =
+        dailyAmounts.reduce(
+          (sum, value) =>
+            sum +
+            Math.pow(value - average, 2),
+          0
+        ) / dailyAmounts.length;
+
+      const standardDeviation =
+        Math.sqrt(variance);
+
+      const coefficient =
+        average > 0
+          ? standardDeviation / average
+          : 0;
+
+      consistencyScore = Math.max(
+        0,
+        Math.min(
+          100,
+          Math.round(
+            100 - coefficient * 50
+          )
+        )
+      );
+    }
+
+    /* ------------------------------------------------------------
+       2. SPENDING TREND
+    ------------------------------------------------------------ */
+
+    const sortedExpenses = [
+      ...behaviorTransactions,
+    ].sort((a, b) => {
+      const dateA =
+        a.date
+          ? new Date(a.date).getTime()
+          : 0;
+
+      const dateB =
+        b.date
+          ? new Date(b.date).getTime()
+          : 0;
+
+      return dateA - dateB;
+    });
+
+    let trendScore = 50;
+
+    if (sortedExpenses.length >= 4) {
+      const midpoint =
+        Math.floor(
+          sortedExpenses.length / 2
+        );
+
+      const earlierExpenses =
+        sortedExpenses.slice(
+          0,
+          midpoint
+        );
+
+      const recentExpenses =
+        sortedExpenses.slice(midpoint);
+
+      const earlierTotal =
+        earlierExpenses.reduce(
+          (sum, transaction) =>
+            sum +
+            Number(
+              transaction.amount || 0
+            ),
+          0
+        );
+
+      const recentTotal =
+        recentExpenses.reduce(
+          (sum, transaction) =>
+            sum +
+            Number(
+              transaction.amount || 0
+            ),
+          0
+        );
+
+      const earlierAverage =
+        earlierTotal /
+        Math.max(
+          1,
+          earlierExpenses.length
+        );
+
+      const recentAverage =
+        recentTotal /
+        Math.max(
+          1,
+          recentExpenses.length
+        );
+
+      if (earlierAverage > 0) {
+        const change =
+          ((recentAverage -
+            earlierAverage) /
+            earlierAverage) *
+          100;
+
+        trendScore = Math.max(
+          0,
+          Math.min(
+            100,
+            Math.round(
+              70 - change * 0.5
+            )
+          )
+        );
+      }
+    }
+
+    /* ------------------------------------------------------------
+       3. LARGE-SPENDING BEHAVIOR
+    ------------------------------------------------------------ */
+
+    const amounts =
+      behaviorTransactions
+        .map((transaction) =>
+          Number(
+            transaction.amount || 0
+          )
+        )
+        .sort((a, b) => a - b);
+
+    const median =
+      amounts.length % 2 === 0
+        ? (
+            amounts[
+              amounts.length / 2 - 1
+            ] +
+            amounts[
+              amounts.length / 2
+            ]
+          ) / 2
+        : amounts[
+            Math.floor(
+              amounts.length / 2
+            )
+          ];
+
+    const largeTransactions =
+      median > 0
+        ? amounts.filter(
+            (amount) =>
+              amount > median * 3
+          ).length
+        : 0;
+
+    const largeTransactionRatio =
+      largeTransactions /
+      Math.max(
+        1,
+        amounts.length
+      );
+
+    const largeSpendingScore =
+      Math.max(
+        0,
+        Math.min(
+          100,
+          Math.round(
+            100 -
+              largeTransactionRatio *
+                100
+          )
+        )
+      );
+
+    /* ------------------------------------------------------------
+       FINAL BEHAVIOR SCORE
+    ------------------------------------------------------------ */
+
+    spendingBehavior =
+      Math.round(
+        consistencyScore * 0.4 +
+        trendScore * 0.35 +
+        largeSpendingScore * 0.25
+      );
+
+    spendingBehavior = Math.max(
+      0,
+      Math.min(
+        100,
+        spendingBehavior
+      )
+    );
+  }
 
   const healthScore = Math.round(
     (Math.max(0, savingsRate) +
@@ -437,14 +761,21 @@ function getRecommendedReduction(
 
       {/* Greeting */}
       <Reveal>
-        <div>
-          <h1 className="text-2xl font-bold text-white">
-            Insights
-          </h1>
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-white">
+              Insights
+            </h1>
 
-          <p className="text-sm text-gray-500 mt-0.5">
-            Deep analysis of your spending behavior
-          </p>
+            <p className="text-sm text-gray-500 mt-0.5">
+              Deep analysis of your spending behavior
+            </p>
+          </div>
+
+          <MonthSelector
+            value={selectedPeriod}
+            onChange={(period) => setSelectedPeriod(period)}
+          />
         </div>
       </Reveal>
 
@@ -458,7 +789,11 @@ function getRecommendedReduction(
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
 
             <StatBox
-              label="This Month"
+              label={
+                selectedPeriod.type === 'all'
+                  ? 'All Time Expense'
+                  : 'Selected Month'
+              }
               value={`₹${totalExpense.toLocaleString(
                 'en-IN'
               )}`}
@@ -886,7 +1221,9 @@ function getRecommendedReduction(
                 status={
                   spendingBehavior >= 70
                     ? 'GOOD'
-                    : 'MODERATE'
+                    : spendingBehavior >= 40
+                    ? 'MODERATE'
+                    : 'LOW'
                 }
               />
 
@@ -995,7 +1332,7 @@ function getRecommendedReduction(
                     </span>
 
                     <span className="text-[10px] font-semibold text-emerald-400 bg-emerald-400/10 px-2 py-1 rounded-full">
-                      Save Up To 
+                      Save Up To  
                       {s.potentialSavings.toLocaleString(
                         'en-IN'
                       )}

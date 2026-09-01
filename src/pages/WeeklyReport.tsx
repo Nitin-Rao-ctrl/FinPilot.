@@ -8,11 +8,61 @@ import {
 } from 'lucide-react';
 import { Reveal } from '@/lib/animations';
 import { supabase } from '@/lib/supabase';
+import {
+  MonthSelector,
+  type SelectedPeriod,
+} from '@/components/MonthSelector';
 
 export function WeeklyReportPage() {
   const [transactions, setTransactions] = useState<any[]>([]);
   const [generated, setGenerated] = useState(true);
   const [generating, setGenerating] = useState(false);
+
+  const [selectedPeriod, setSelectedPeriod] =
+    useState<SelectedPeriod>(() => {
+      try {
+        const saved = localStorage.getItem(
+          'finpilot_selected_period'
+        );
+
+        if (saved) {
+          const parsed = JSON.parse(saved);
+
+          if (parsed?.type === 'all') {
+            return { type: 'all' };
+          }
+
+          if (
+            parsed?.type === 'month' &&
+            typeof parsed.year === 'number' &&
+            typeof parsed.month === 'number'
+          ) {
+            return {
+              type: 'month',
+              year: parsed.year,
+              month: parsed.month,
+            };
+          }
+        }
+      } catch {
+        // Ignore invalid saved period
+      }
+
+      const now = new Date();
+
+      return {
+        type: 'month',
+        year: now.getFullYear(),
+        month: now.getMonth(),
+      };
+    });
+
+  useEffect(() => {
+    localStorage.setItem(
+      'finpilot_selected_period',
+      JSON.stringify(selectedPeriod)
+    );
+  }, [selectedPeriod]);
 
  useEffect(() => {
   async function loadTransactions() {
@@ -55,15 +105,62 @@ export function WeeklyReportPage() {
 
   loadTransactions();
 }, []);
-  const now = new Date();
+  const today = new Date();
 
-  const weekStart = new Date(now);
-  weekStart.setDate(now.getDate() - 6);
-  weekStart.setHours(0, 0, 0, 0);
+  /*
+   * The report always covers up to 7 days, inside the selected month.
+   * Current month: ends today.
+   * Previous month: ends on the last day of that month.
+   * All Time: keeps the original recent 7-day behavior.
+   */
+  const reportEnd = new Date(today);
+
+  if (selectedPeriod.type === 'month') {
+    const isCurrentMonth =
+      selectedPeriod.year === today.getFullYear() &&
+      selectedPeriod.month === today.getMonth();
+
+    if (!isCurrentMonth) {
+      reportEnd.setFullYear(
+        selectedPeriod.year,
+        selectedPeriod.month + 1,
+        0
+      );
+      reportEnd.setHours(23, 59, 59, 999);
+    }
+  }
+
+  const monthStart =
+    selectedPeriod.type === 'month'
+      ? new Date(
+          selectedPeriod.year,
+          selectedPeriod.month,
+          1
+        )
+      : null;
+
+  const weekStartCandidate = new Date(reportEnd);
+  weekStartCandidate.setDate(
+    reportEnd.getDate() - 6
+  );
+  weekStartCandidate.setHours(0, 0, 0, 0);
+
+  const weekStart =
+    monthStart &&
+    weekStartCandidate < monthStart
+      ? monthStart
+      : weekStartCandidate;
 
   const weekTransactions = transactions.filter((t) => {
+    if (!t.date) return false;
+
     const date = new Date(t.date);
-    return date >= weekStart && date <= now;
+
+    if (Number.isNaN(date.getTime())) {
+      return false;
+    }
+
+    return date >= weekStart && date <= reportEnd;
   });
 
   const expenses = weekTransactions.filter(
@@ -142,7 +239,7 @@ export function WeeklyReportPage() {
   let aiInsight =
     'Add more transactions to generate a personalized financial insight.';
 
-  if (transactions.length > 0 && spending === 0) {
+  if (weekTransactions.length > 0 && spending === 0) {
     aiInsight =
       'You have no recorded expenses for this week. Keep tracking your spending to maintain accurate financial insights.';
   } else if (spending > income && income > 0) {
@@ -216,7 +313,7 @@ export function WeeklyReportPage() {
 
       {/* Header */}
       <Reveal>
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-4">
 
           <div>
             <h1 className="text-2xl font-bold text-white">
@@ -224,11 +321,19 @@ export function WeeklyReportPage() {
             </h1>
 
             <p className="text-sm text-gray-500 mt-0.5">
-              {formatDate(weekStart)} — {formatDate(now)}
+              {formatDate(weekStart)} — {formatDate(reportEnd)}
             </p>
           </div>
 
-          {!generated && (
+          <div className="flex items-center gap-3">
+            <MonthSelector
+              value={selectedPeriod}
+              onChange={(period) =>
+                setSelectedPeriod(period)
+              }
+            />
+
+            {!generated && (
             <button
               onClick={handleGenerate}
               disabled={generating}
@@ -246,7 +351,8 @@ export function WeeklyReportPage() {
                 </>
               )}
             </button>
-          )}
+            )}
+          </div>
 
         </div>
       </Reveal>
@@ -313,7 +419,7 @@ export function WeeklyReportPage() {
                     </p>
 
                     <p className="text-xs text-gray-500">
-                      {formatDate(weekStart)} — {formatDate(now)}
+                      {formatDate(weekStart)} — {formatDate(reportEnd)}
                     </p>
 
                   </div>
@@ -478,7 +584,9 @@ export function WeeklyReportPage() {
                 </span>
 
                 <span className="text-xs text-gray-500">
-                  This week
+                  {selectedPeriod.type === 'all'
+                    ? 'Recent 7 days'
+                    : 'Selected month · 7-day report'}
                 </span>
 
               </div>
@@ -533,7 +641,7 @@ export function WeeklyReportPage() {
                 ) : (
                   <p className="text-sm text-gray-500">
                     No expense data available for
-                    this week.
+                    this report period.
                   </p>
                 )}
 

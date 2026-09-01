@@ -22,6 +22,10 @@ import {
 
 import { Reveal } from "@/lib/animations";
 import { supabase } from "@/lib/supabase";
+import {
+  MonthSelector,
+  type SelectedPeriod,
+} from '@/components/MonthSelector';
 
 /* ============================================================
    API
@@ -610,6 +614,51 @@ export function TransactionsPage() {
 
   const [actionLoading, setActionLoading] =
     useState(false);
+    const [selectedPeriod, setSelectedPeriod] =
+  useState<SelectedPeriod>(() => {
+    try {
+      const saved = localStorage.getItem(
+        'finpilot_selected_period'
+      );
+
+      if (saved) {
+        const parsed = JSON.parse(saved);
+
+        if (parsed?.type === 'all') {
+          return { type: 'all' };
+        }
+
+        if (
+          parsed?.type === 'month' &&
+          typeof parsed.year === 'number' &&
+          typeof parsed.month === 'number'
+        ) {
+          return {
+            type: 'month',
+            year: parsed.year,
+            month: parsed.month,
+          };
+        }
+      }
+    } catch {
+      // Ignore invalid saved period
+    }
+
+    const now = new Date();
+
+    return {
+      type: 'month',
+      year: now.getFullYear(),
+      month: now.getMonth(),
+    };
+  });
+
+  useEffect(() => {
+    localStorage.setItem(
+      "finpilot_selected_period",
+      JSON.stringify(selectedPeriod)
+    );
+  }, [selectedPeriod]);
 
   /* ==========================================================
      CUSTOM DELETE MODAL
@@ -687,82 +736,90 @@ export function TransactionsPage() {
   /* ==========================================================
      FILTER + SORT
   ========================================================== */
+const periodTransactions = useMemo(() => {
+  if (selectedPeriod.type === "all") {
+    return transactions;
+  }
 
-  const filtered = useMemo(() => {
-    let result = [
-      ...transactions,
-    ];
+  return transactions.filter((transaction) => {
+    if (!transaction.date) return false;
 
-    if (search.trim()) {
-      const q =
-        normalizeText(search);
+    const date = new Date(transaction.date);
 
-      result = result.filter(
-        (transaction) => {
-          const description =
-            normalizeText(
-              transaction.description,
-            );
+    if (Number.isNaN(date.getTime())) {
+      return false;
+    }
 
-          const merchant =
-            normalizeText(
-              transaction.merchant || "",
-            );
+    return (
+      date.getFullYear() === selectedPeriod.year &&
+      date.getMonth() === selectedPeriod.month
+    );
+  });
+}, [transactions, selectedPeriod]);
 
-          const category =
-            normalizeText(
-              transaction.category,
-            );
+const filtered = useMemo(() => {
+  let result = [...periodTransactions];
 
-          return (
-            description.includes(q) ||
-            merchant.includes(q) ||
-            category.includes(q)
-          );
-        },
+  if (search.trim()) {
+    const q = normalizeText(search);
+
+    result = result.filter((transaction) => {
+      const description = normalizeText(
+        transaction.description
       );
-    }
 
-    if (filterType !== "all") {
-      result =
-        result.filter(
-          (transaction) =>
-            transaction.type ===
-            filterType,
-        );
-    }
+      const merchant = normalizeText(
+        transaction.merchant || ""
+      );
 
-    if (filterCategory !== "all") {
-      result =
-        result.filter(
-          (transaction) =>
-            transaction.category ===
-            filterCategory,
-        );
-    }
-
-    result.sort((a, b) => {
-      if (sortBy === "amount") {
-        return (
-          Number(b.amount || 0) -
-          Number(a.amount || 0)
-        );
-      }
+      const category = normalizeText(
+        transaction.category
+      );
 
       return (
-        new Date(b.date).getTime() -
-        new Date(a.date).getTime()
+        description.includes(q) ||
+        merchant.includes(q) ||
+        category.includes(q)
       );
     });
+  }
 
-    return result;
-  }, [
-    transactions,
-    search,
-    filterType,
-    filterCategory,
-    sortBy,
-  ]);
+  if (filterType !== "all") {
+    result = result.filter(
+      (transaction) =>
+        transaction.type === filterType
+    );
+  }
+
+  if (filterCategory !== "all") {
+    result = result.filter(
+      (transaction) =>
+        transaction.category === filterCategory
+    );
+  }
+
+  result.sort((a, b) => {
+    if (sortBy === "amount") {
+      return (
+        Number(b.amount || 0) -
+        Number(a.amount || 0)
+      );
+    }
+
+    return (
+      new Date(b.date).getTime() -
+      new Date(a.date).getTime()
+    );
+  });
+
+  return result;
+}, [
+  periodTransactions,
+  search,
+  filterType,
+  filterCategory,
+  sortBy,
+]);
 
   /* ==========================================================
      TOTALS
@@ -770,7 +827,7 @@ export function TransactionsPage() {
 
   const totalIncome = useMemo(
     () =>
-      transactions
+      periodTransactions
         .filter(
           (transaction) =>
             transaction.type ===
@@ -784,12 +841,12 @@ export function TransactionsPage() {
             ),
           0,
         ),
-    [transactions],
+    [periodTransactions],
   );
 
   const totalExpense = useMemo(
     () =>
-      transactions
+      periodTransactions
         .filter(
           (transaction) =>
             transaction.type ===
@@ -803,7 +860,7 @@ export function TransactionsPage() {
             ),
           0,
         ),
-    [transactions],
+    [periodTransactions],
   );
 
   /* ==========================================================
@@ -1008,17 +1065,24 @@ export function TransactionsPage() {
               </p>
             </div>
 
-            <button
-              type="button"
-              onClick={() => {
-                setEditing(null);
-                setShowForm(true);
-              }}
-              className="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 bg-emerald-500 text-black font-semibold hover:bg-emerald-400 transition-colors"
-            >
-              <Plus className="w-4 h-4" />
-              Add Transaction
-            </button>
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+              <MonthSelector
+                value={selectedPeriod}
+                onChange={setSelectedPeriod}
+              />
+
+              <button
+                type="button"
+                onClick={() => {
+                  setEditing(null);
+                  setShowForm(true);
+                }}
+                className="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 bg-emerald-500 text-black font-semibold hover:bg-emerald-400 transition-colors"
+              >
+                <Plus className="w-4 h-4" />
+                Add Transaction
+              </button>
+            </div>
           </div>
         </Reveal>
 
