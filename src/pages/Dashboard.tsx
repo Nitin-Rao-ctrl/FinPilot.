@@ -5,7 +5,7 @@
     Activity,
     AlertTriangle,
     Zap,
-    Droplet,
+
     Target,
     FileText,
     Calendar,
@@ -415,44 +415,7 @@ useEffect(() => {
         3
     );
 
-    /* ============================================================
-      MONEY LEAKS
-    ============================================================ */
-
-    const moneyLeaks =
-      categoryBreakdown
-        .filter((cat) => cat.amount > 0)
-        .slice(0, 3)
-        .map((cat) => {
-          const categoryTransactions =
-            transactions.filter(
-              (t) =>
-                t.type === 'expense' &&
-                (t.category || 'Other') ===
-                  cat.category
-            );
-
-          const count =
-            categoryTransactions.length;
-
-          const average =
-            Math.round(
-              cat.amount /
-                Math.max(1, count)
-            );
-
-          return {
-            count,
-            category: cat.category,
-            merchant: cat.category,
-            total: cat.amount,
-            average,
-            potentialSavings:
-              Math.round(
-                cat.amount * 0.2
-              ),
-          };
-        });
+    
 
     /* ============================================================
       TOP CATEGORY / INSIGHTS
@@ -1325,91 +1288,7 @@ const projectedMonthEndBalance = Math.round(
 
         </Reveal>
 
-        {/* ======================================================
-            MONEY LEAKS
-        ====================================================== */}
-
-        <Reveal delay={200}>
-
-          <div className="glass-card p-5">
-
-            <div className="flex items-center justify-between mb-4">
-
-              <span className="metric-label">
-                Money Leak Detection
-              </span>
-
-              <Droplet className="w-4 h-4 text-emerald-400/50" />
-
-            </div>
-
-            <div className="space-y-3">
-
-              {moneyLeaks.length > 0 ? (
-
-                moneyLeaks.map(
-                  (leak, i) => (
-
-                    <div
-                      key={`${leak.category}-${i}`}
-                      className="bg-emerald-400/[0.04] border border-emerald-400/10 rounded-xl p-3"
-                    >
-
-                      <div className="flex items-start gap-2">
-
-                        <Droplet className="w-4 h-4 text-emerald-400 mt-0.5 flex-shrink-0" />
-
-                        <div>
-
-                          <p className="text-sm text-gray-200">
-                            {leak.count} spending transactions in{' '}
-                            {leak.category}
-                          </p>
-
-                          <p className="text-xs text-gray-500 mt-0.5">
-
-                            Total ₹
-                            {leak.total.toLocaleString(
-                              'en-IN'
-                            )}{' '}
-                            · Avg ₹
-                            {leak.average.toLocaleString(
-                              'en-IN'
-                            )}{' '}
-                            · Save{' '}
-
-                            <span className="text-emerald-400">
-                              ₹
-                              {leak.potentialSavings.toLocaleString(
-                                'en-IN'
-                              )}
-                            </span>
-
-                          </p>
-
-                        </div>
-
-                      </div>
-
-                    </div>
-
-                  )
-                )
-
-              ) : (
-
-                <p className="text-sm text-gray-500">
-                  No spending data available yet.
-                </p>
-
-              )}
-
-            </div>
-
-          </div>
-
-        </Reveal>
-
+        
         {/* ======================================================
             INSIGHTS + FINANCIAL SUMMARY
         ====================================================== */}
