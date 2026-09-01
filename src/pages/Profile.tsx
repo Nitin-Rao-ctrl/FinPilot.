@@ -8,7 +8,6 @@ export function ProfilePage() {
   const [email, setEmail] = useState('');
   const [currency, setCurrency] = useState('INR');
   const [monthlyIncome, setMonthlyIncome] = useState('');
-  const [monthlyBudget, setMonthlyBudget] = useState('');
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
@@ -48,14 +47,6 @@ export function ProfilePage() {
               String(parsed.monthlyIncome)
             );
           }
-
-          if (
-            typeof parsed.monthlyBudget === 'number'
-          ) {
-            setMonthlyBudget(
-              String(parsed.monthlyBudget)
-            );
-          }
         } catch (error) {
           console.error(
             'Failed to load saved profile:',
@@ -76,8 +67,6 @@ export function ProfilePage() {
         currency,
         monthlyIncome:
           Number(monthlyIncome) || 0,
-        monthlyBudget:
-          Number(monthlyBudget) || 0,
       })
     );
 
@@ -111,7 +100,9 @@ export function ProfilePage() {
           <div className="flex items-center gap-4">
 
             <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-500 flex items-center justify-center">
-              <User className="w-8 h-8 text-[#050505]" />
+              <User
+                className="w-8 h-8 text-[#050505]"
+              />
             </div>
 
             <div>
@@ -222,25 +213,6 @@ export function ProfilePage() {
               />
             </div>
 
-            {/* Monthly Budget */}
-            <div>
-              <label className="block text-xs uppercase tracking-wider text-gray-500 font-medium mb-1.5">
-                Monthly Budget
-              </label>
-
-              <input
-                type="number"
-                min="0"
-                value={monthlyBudget}
-                onChange={(e) => {
-                  setMonthlyBudget(e.target.value);
-                  setSaved(false);
-                }}
-                placeholder="Enter monthly budget"
-                className="form-input"
-              />
-            </div>
-
             {/* Save */}
             <div className="pt-1">
               <button
@@ -274,7 +246,7 @@ export function ProfilePage() {
             Financial Summary
           </p>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 gap-4">
 
             <div className="bg-white/[0.02] rounded-xl p-4">
               <p className="metric-label">
@@ -285,42 +257,6 @@ export function ProfilePage() {
                 ₹
                 {Number(
                   monthlyIncome || 0
-                ).toLocaleString('en-IN')}
-              </p>
-            </div>
-
-            <div className="bg-white/[0.02] rounded-xl p-4">
-              <p className="metric-label">
-                Monthly Budget
-              </p>
-
-              <p className="text-xl font-bold text-white mt-1">
-                ₹
-                {Number(
-                  monthlyBudget || 0
-                ).toLocaleString('en-IN')}
-              </p>
-            </div>
-
-            <div className="bg-white/[0.02] rounded-xl p-4">
-              <p className="metric-label">
-                Available for Savings
-              </p>
-
-              <p
-                className={`text-xl font-bold mt-1 ${
-                  Number(monthlyIncome || 0) -
-                    Number(monthlyBudget || 0) >=
-                  0
-                    ? 'text-emerald-400'
-                    : 'text-red-400'
-                }`}
-              >
-                ₹
-                {Math.max(
-                  0,
-                  Number(monthlyIncome || 0) -
-                    Number(monthlyBudget || 0)
                 ).toLocaleString('en-IN')}
               </p>
             </div>
