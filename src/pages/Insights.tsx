@@ -39,7 +39,8 @@ const PIE_COLORS = [
 
 export function InsightsPage() {
   const [transactions, setTransactions] = useState<any[]>([]);
-
+const [showCategoryAnalysis, setShowCategoryAnalysis] =
+  useState(false);
  useEffect(() => {
   async function loadTransactions() {
     try {
@@ -468,138 +469,151 @@ export function InsightsPage() {
         </div>
       </Reveal>
 
-      {/* Category Analysis */}
-      <Reveal delay={150}>
-        <div className="grid md:grid-cols-2 gap-4">
+      {/* Category Analysis / Breakdown */}
+<Reveal delay={150}>
+  <div className="glass-card p-5">
 
-          <div className="glass-card p-5">
+    <div className="flex items-center justify-between mb-4">
+      <span className="metric-label">
+        {showCategoryAnalysis
+          ? 'Category Analysis'
+          : 'Breakdown by Amount'}
+      </span>
 
-            <span className="metric-label">
-              Category Analysis
-            </span>
+      <button
+        type="button"
+        onClick={() =>
+          setShowCategoryAnalysis(
+            !showCategoryAnalysis
+          )
+        }
+        className="text-xs font-medium text-emerald-400 hover:text-emerald-300 transition-colors"
+      >
+        {showCategoryAnalysis
+          ? 'View Breakdown'
+          : 'View Category Analysis'}
+      </button>
+    </div>
 
-            <ResponsiveContainer
-              width="100%"
-              height={200}
-            >
-              <PieChart>
+    {showCategoryAnalysis ? (
+      /* ============================
+         CATEGORY ANALYSIS
+      ============================ */
+      <ResponsiveContainer
+        width="100%"
+        height={260}
+      >
+        <PieChart>
 
-                <Pie
-                  data={categoryBreakdown}
-                  dataKey="percentage"
-                  nameKey="category"
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={50}
-                  outerRadius={80}
-                  paddingAngle={3}
-                >
-                  {categoryBreakdown.map(
-                    (_, i) => (
-                      <Cell
-                        key={i}
-                        fill={
-                          PIE_COLORS[
-                            i %
-                              PIE_COLORS.length
-                          ]
-                        }
-                      />
-                    )
+          <Pie
+            data={categoryBreakdown}
+            dataKey="percentage"
+            nameKey="category"
+            cx="50%"
+            cy="50%"
+            innerRadius={60}
+            outerRadius={95}
+            paddingAngle={3}
+          >
+            {categoryBreakdown.map(
+              (_, i) => (
+                <Cell
+                  key={i}
+                  fill={
+                    PIE_COLORS[
+                      i % PIE_COLORS.length
+                    ]
+                  }
+                />
+              )
+            )}
+          </Pie>
+
+          <Tooltip
+            contentStyle={{
+              background: '#0C0F0D',
+              border:
+                '1px solid #1a1f1c',
+              borderRadius: '8px',
+              fontSize: '12px',
+            }}
+          />
+
+        </PieChart>
+      </ResponsiveContainer>
+    ) : (
+      /* ============================
+         BREAKDOWN BY AMOUNT
+      ============================ */
+      <div className="space-y-3">
+
+        {categoryBreakdown.map(
+          (cat, i) => (
+            <div key={cat.category}>
+
+              <div className="flex items-center justify-between mb-1">
+
+                <div className="flex items-center gap-2">
+
+                  <span
+                    className="w-2.5 h-2.5 rounded-full"
+                    style={{
+                      background:
+                        PIE_COLORS[
+                          i %
+                            PIE_COLORS.length
+                        ],
+                    }}
+                  />
+
+                  <span className="text-sm text-gray-200">
+                    {cat.category}
+                  </span>
+
+                  {cat.percentage >
+                    40 && (
+                    <span className="text-[10px] text-amber-400 font-medium">
+                      High concentration
+                    </span>
                   )}
-                </Pie>
 
-                <Tooltip
-                  contentStyle={{
-                    background: '#0C0F0D',
-                    border:
-                      '1px solid #1a1f1c',
-                    borderRadius: '8px',
-                    fontSize: '12px',
+                </div>
+
+                <span className="text-xs text-gray-400">
+                  ₹
+                  {cat.total.toLocaleString(
+                    'en-IN'
+                  )}{' '}
+                  · {cat.percentage}%
+                </span>
+
+              </div>
+
+              <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
+
+                <div
+                  className="h-full rounded-full"
+                  style={{
+                    width: `${cat.percentage}%`,
+                    background:
+                      PIE_COLORS[
+                        i %
+                          PIE_COLORS.length
+                      ],
                   }}
                 />
 
-              </PieChart>
-            </ResponsiveContainer>
-
-          </div>
-
-          <div className="glass-card p-5">
-
-            <span className="metric-label">
-              Breakdown by Amount
-            </span>
-
-            <div className="space-y-3 mt-3">
-
-              {categoryBreakdown.map(
-                (cat, i) => (
-                  <div key={cat.category}>
-
-                    <div className="flex items-center justify-between mb-1">
-
-                      <div className="flex items-center gap-2">
-
-                        <span
-                          className="w-2.5 h-2.5 rounded-full"
-                          style={{
-                            background:
-                              PIE_COLORS[
-                                i %
-                                  PIE_COLORS.length
-                              ],
-                          }}
-                        />
-
-                        <span className="text-sm text-gray-200">
-                          {cat.category}
-                        </span>
-
-                        {cat.percentage >
-                          40 && (
-                          <span className="text-[10px] text-amber-400 font-medium">
-                            High concentration
-                          </span>
-                        )}
-
-                      </div>
-
-                      <span className="text-xs text-gray-400">
-                        ₹
-                        {cat.total.toLocaleString(
-                          'en-IN'
-                        )}{' '}
-                        · {cat.percentage}%
-                      </span>
-
-                    </div>
-
-                    <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
-
-                      <div
-                        className="h-full rounded-full"
-                        style={{
-                          width: `${cat.percentage}%`,
-                          background:
-                            PIE_COLORS[
-                              i %
-                                PIE_COLORS.length
-                            ],
-                        }}
-                      />
-
-                    </div>
-
-                  </div>
-                )
-              )}
+              </div>
 
             </div>
-          </div>
+          )
+        )}
 
-        </div>
-      </Reveal>
+      </div>
+    )}
 
+  </div>
+</Reveal>
       {/* Behavior Trend */}
       <Reveal delay={200}>
         <div className="glass-card p-5">
