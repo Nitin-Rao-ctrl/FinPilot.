@@ -541,29 +541,25 @@ useEffect(() => {
       CASHFLOW FORECAST
     ============================================================ */
 
-    const averageDailyExpense =
-      daysElapsed > 0
-        ? currentMonthExpense /
-          daysElapsed
-        : 0;
+   const forecastDays = Math.max(daysElapsed, 7);
 
-    const projectedRemainingExpense =
-      Math.round(
-        averageDailyExpense *
-          daysRemaining
-      );
+const averageDailyExpense =
+  currentMonthExpense > 0
+    ? currentMonthExpense / forecastDays
+    : 0;
 
-    const projectedMonthEndExpense =
-      Math.round(
-        currentMonthExpense +
-          projectedRemainingExpense
-      );
+const projectedRemainingExpense = Math.round(
+  averageDailyExpense * daysRemaining
+);
 
-    const projectedMonthEndBalance =
-      Math.round(
-        currentMonthBalance -
-          projectedRemainingExpense
-      );
+const projectedMonthEndExpense = Math.round(
+  currentMonthExpense + projectedRemainingExpense
+);
+
+const projectedMonthEndBalance = Math.round(
+  currentMonthBalance - projectedRemainingExpense
+);
+    
 
     const forecastStatus =
       projectedMonthEndBalance < 0
