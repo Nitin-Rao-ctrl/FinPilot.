@@ -218,6 +218,30 @@ const totalIncome = selectedTransactions
     0
   );
 
+const totalFixedExpense = selectedTransactions
+  .filter(
+    (t) =>
+      t.type === 'expense' &&
+      t.expenseType === 'fixed'
+  )
+  .reduce(
+    (sum, t) =>
+      sum + Number(t.amount || 0),
+    0
+  );
+
+const totalVariableExpense = selectedTransactions
+  .filter(
+    (t) =>
+      t.type === 'expense' &&
+      t.expenseType !== 'fixed'
+  )
+  .reduce(
+    (sum, t) =>
+      sum + Number(t.amount || 0),
+    0
+  );
+
 const totalExpense = selectedTransactions
   .filter((t) => t.type === 'expense')
   .reduce(
@@ -352,9 +376,9 @@ const currentMonthFixedExpense =
           category,
           amount,
           percentage:
-            totalExpense > 0
+            totalVariableExpense > 0
               ? Math.round(
-                  (amount / totalExpense) * 100
+                  (amount / totalVariableExpense) * 100
                 )
               : 0,
         }))
@@ -843,16 +867,19 @@ if (expenseTransactions.length > 0) {
 
 const forecastDays = Math.max(daysElapsed, 1);
 
-const averageDailyExpense =
+const averageDailyVariableSpendForecast =
   isCurrentMonth &&
   currentMonthVariableExpense > 0
     ? currentMonthVariableExpense / forecastDays
     : 0;
 
-const projectedRemainingExpense =
-  isCurrentMonth
+const hasReliableForecastHistory =
+  isCurrentMonth && daysElapsed >= 3;
+
+const projectedRemainingVariableExpense =
+  hasReliableForecastHistory
     ? Math.round(
-        averageDailyExpense * daysRemaining
+        averageDailyVariableSpendForecast * daysRemaining
       )
     : 0;
 
@@ -860,7 +887,7 @@ const projectedMonthEndExpense =
   isCurrentMonth
     ? Math.round(
         currentMonthExpense +
-          projectedRemainingExpense
+          projectedRemainingVariableExpense
       )
     : currentMonthExpense;
 
@@ -868,12 +895,12 @@ const projectedMonthEndBalance =
   isCurrentMonth
     ? Math.round(
         currentMonthBalance -
-          projectedRemainingExpense
+          projectedRemainingVariableExpense
       )
     : currentMonthBalance;
 
 const forecastStatus =
-  !isCurrentMonth
+  !isCurrentMonth || !hasReliableForecastHistory
     ? 'positive'
     : projectedMonthEndBalance < 0
     ? 'danger'
@@ -885,11 +912,13 @@ const forecastStatus =
 const forecastMessage =
   !isCurrentMonth
     ? 'This month is complete. These are your actual final numbers.'
+    : !hasReliableForecastHistory
+    ? 'Add at least 3 days of spending history for a more reliable variable-spending forecast.'
     : forecastStatus === 'danger'
-    ? 'At your current spending rate, your expenses may exceed your available cash before the month ends.'
+    ? 'At your current variable spending rate, your expenses may exceed your available cash before the month ends.'
     : forecastStatus === 'warning'
-    ? 'Your current spending rate suggests a low month-end balance. Consider reducing discretionary spending.'
-    : 'Your current spending rate looks manageable for the rest of the month.';
+    ? 'Your current variable spending rate suggests a low month-end balance. Consider reducing discretionary spending.'
+    : 'Your current variable spending rate looks manageable for the rest of the month.';
     /* ============================================================
       VARIABLE SPENDING ANALYSIS
       Fixed expenses are excluded from discretionary spending rate.
@@ -1286,7 +1315,7 @@ const runOutDays =
               <ForecastCard
                 label="Avg / Day"
                 value={Math.round(
-                  averageDailyExpense
+                  averageDailyVariableSpendForecast
                 )}
               />
 
@@ -1296,7 +1325,7 @@ const runOutDays =
       ? 'Expected Variable Spend'
       : 'Variable Spend'
   }
-  value={projectedRemainingExpense}
+  value={projectedRemainingVariableExpense}
 />
 
               <ForecastCard

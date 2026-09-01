@@ -265,7 +265,7 @@ export function InsightsPage() {
     () =>
       expenses.filter(
         (transaction) =>
-          transaction.expenseType === 'fixed'
+          String(transaction.expenseType || '').toLowerCase() === 'fixed'
       ),
     [expenses]
   );
@@ -274,7 +274,7 @@ export function InsightsPage() {
     () =>
       expenses.filter(
         (transaction) =>
-          transaction.expenseType !== 'fixed'
+          String(transaction.expenseType || '').toLowerCase() !== 'fixed'
       ),
     [expenses]
   );
