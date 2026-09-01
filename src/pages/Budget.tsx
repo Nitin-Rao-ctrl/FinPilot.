@@ -7,6 +7,7 @@ type Category = {
   category: string;
   total: number;
   percentage: number;
+  expenseType: 'fixed' | 'variable';
 };
 
 export function BudgetPage() {
@@ -137,32 +138,53 @@ const expenses = transactions.filter(
 
       setSpent(totalSpent);
 
-      const categoryMap: Record<
-        string,
-        number
-      > = {};
+      const categoryMap: Record<string, {
+        total: number;
+        expenseType: 'fixed' | 'variable';
+      }> = {};
 
       expenses.forEach((t: any) => {
         const category =
           t.category || 'Other';
 
-        categoryMap[category] =
-          (categoryMap[category] || 0) +
+        const expenseType =
+          String(t.expenseType || '').toLowerCase() === 'fixed'
+            ? 'fixed'
+            : 'variable';
+
+        const key = `${category}__${expenseType}`;
+
+        if (!categoryMap[key]) {
+          categoryMap[key] = {
+            total: 0,
+            expenseType,
+          };
+        }
+
+        categoryMap[key].total +=
           Number(t.amount || 0);
       });
 
       const breakdown = Object.entries(
         categoryMap
-      ).map(([category, total]) => ({
-        category,
-        total,
-        percentage:
-          totalSpent > 0
-            ? Math.round(
-                (total / totalSpent) * 100
-              )
-            : 0,
-      }));
+      ).map(([key, value]) => {
+        const separatorIndex = key.lastIndexOf('__');
+        const category = key.slice(0, separatorIndex);
+
+        return {
+          category,
+          total: value.total,
+          expenseType: value.expenseType,
+          percentage:
+            totalSpent > 0
+              ? Math.round(
+                  (value.total / totalSpent) * 100
+                )
+              : 0,
+        };
+      });
+
+      breakdown.sort((a, b) => b.total - a.total);
 
       setCategories(breakdown);
     } catch (error) {
@@ -449,6 +471,10 @@ const expenses = transactions.filter(
             Category Breakdown vs Budget
           </span>
 
+          <p className="text-xs text-gray-600 mt-1">
+            Fixed commitments count toward your real budget, but are clearly separated from variable spending.
+          </p>
+
           <div className="space-y-3 mt-4">
 
             {categories.length === 0 ? (
@@ -474,6 +500,18 @@ const expenses = transactions.filter(
 
                       <span className="text-sm text-gray-200">
                         {cat.category}
+                      </span>
+
+                      <span
+                        className={`text-[10px] px-2 py-0.5 rounded-full ${
+                          cat.expenseType === 'fixed'
+                            ? 'bg-amber-400/10 text-amber-400'
+                            : 'bg-emerald-400/10 text-emerald-400'
+                        }`}
+                      >
+                        {cat.expenseType === 'fixed'
+                          ? 'Fixed'
+                          : 'Variable'}
                       </span>
 
                       <span className="text-xs text-gray-500">

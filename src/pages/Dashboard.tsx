@@ -6,12 +6,9 @@
     AlertTriangle,
     Zap,
 
-    Target,
     FileText,
     Calendar,
     Check,
-    Lightbulb,
-    ArrowRight,
   } from 'lucide-react';
 
   import {
@@ -29,14 +26,11 @@
   } from 'recharts';
 
   import { Link } from 'react-router-dom';
-  import { useEffect, useState } from 'react';
+  import { useEffect, useState, type ReactNode } from 'react';
 
   import { CountUp, Reveal } from '@/lib/animations';
   import { supabase } from '@/lib/supabase';
-  import {
-  MonthSelector,
-  type SelectedPeriod,
-} from '@/components/MonthSelector';
+  import type { SelectedPeriod } from '@/components/MonthSelector';
 
   const PIE_COLORS = [
     '#00FF88',
@@ -47,14 +41,15 @@
     '#065F46',
   ];
 
-  type Transaction = {
-    id?: string | number;
-    amount?: number | string;
-    type?: string;
-    category?: string;
-    date?: string;
-    description?: string;
-  };
+ type Transaction = {
+  id?: string | number;
+  amount?: number | string;
+  type?: string;
+  category?: string;
+  expenseType?: 'fixed' | 'variable';
+  date?: string;
+  description?: string;
+};
 
   type Insight = {
     type: 'positive' | 'warning' | 'danger';
@@ -71,7 +66,7 @@
 const [loading, setLoading] = useState(true);
 const [userName, setUserName] = useState('User');
 
-const [selectedPeriod, setSelectedPeriod] =
+const [selectedPeriod] =
   useState<SelectedPeriod>(() => {
     try {
       const saved = localStorage.getItem(
@@ -243,6 +238,11 @@ const totalExpense = selectedTransactions
 
     const currentMonth = today.getMonth();
     const currentYear = today.getFullYear();
+    
+    const isCurrentMonth =
+  selectedPeriod.type === 'month' &&
+  selectedPeriod.month === currentMonth &&
+  selectedPeriod.year === currentYear;
 
     /* ============================================================
       CURRENT MONTH TRANSACTIONS
@@ -287,8 +287,43 @@ const totalExpense = selectedTransactions
         );
 
     const currentMonthBalance =
-      currentMonthIncome -
-      currentMonthExpense;
+      currentMonthIncome - currentMonthExpense;
+
+   /* ============================================================
+  FIXED vs VARIABLE EXPENSES
+  Fixed expenses like rent, EMI and mess are excluded
+  from spending-behavior calculations.
+============================================================ */
+
+const variableExpenseTransactions =
+  currentMonthTransactions.filter(
+    (t) =>
+      t.type === 'expense' &&
+      t.expenseType !== 'fixed' &&
+      Number(t.amount || 0) > 0
+  );
+
+const fixedExpenseTransactions =
+  currentMonthTransactions.filter(
+    (t) =>
+      t.type === 'expense' &&
+      t.expenseType === 'fixed' &&
+      Number(t.amount || 0) > 0
+  );
+
+const currentMonthVariableExpense =
+  variableExpenseTransactions.reduce(
+    (sum, t) =>
+      sum + Number(t.amount || 0),
+    0
+  );
+
+const currentMonthFixedExpense =
+  fixedExpenseTransactions.reduce(
+    (sum, t) =>
+      sum + Number(t.amount || 0),
+    0
+  );
 
     /* ============================================================
       CATEGORY BREAKDOWN
@@ -296,8 +331,12 @@ const totalExpense = selectedTransactions
 
     const categoryMap: Record<string, number> = {};
 
-    transactions
-      .filter((t) => t.type === 'expense')
+    selectedTransactions
+      .filter(
+        (t) =>
+          t.type === 'expense' &&
+          t.expenseType !== 'fixed'
+      )
       .forEach((t) => {
         const category =
           t.category?.trim() || 'Other';
@@ -327,8 +366,12 @@ const totalExpense = selectedTransactions
 
     const spendingMap: Record<string, number> = {};
 
-    transactions
-      .filter((t) => t.type === 'expense')
+    selectedTransactions
+      .filter(
+        (t) =>
+          t.type === 'expense' &&
+          t.expenseType !== 'fixed'
+      )
       .forEach((t) => {
         if (!t.date) return;
 
@@ -367,9 +410,12 @@ const totalExpense = selectedTransactions
     const todayExpenses = transactions.filter(
       (t) => {
         if (t.type !== 'expense') return false;
+        if (t.expenseType === 'fixed') return false;
         if (!t.date) return false;
 
         const date = new Date(t.date);
+
+        if (Number.isNaN(date.getTime())) return false;
 
         return (
           date.getDate() === today.getDate() &&
@@ -408,16 +454,28 @@ const totalExpense = selectedTransactions
 
     /* ============================================================
       DAILY SPENDING LIMIT
+
+      This is a discretionary limit.
+      Fixed commitments are not treated as daily spending.
     ============================================================ */
+
+    const remainingVariableBudget = Math.max(
+      0,
+      totalIncome - currentMonthFixedExpense - currentMonthVariableExpense
+    );
+
+    const daysForDailyLimit = Math.max(
+      1,
+      isCurrentMonth ? daysRemaining || 1 : 30
+    );
 
     const dailyLimit =
       totalIncome > 0
         ? Math.max(
             0,
             Math.round(
-              (balance > 0
-                ? balance
-                : totalIncome) / 30
+              remainingVariableBudget /
+                daysForDailyLimit
             )
           )
         : 0;
@@ -450,7 +508,8 @@ const totalExpense = selectedTransactions
               100,
               Math.round(
                 ((totalIncome -
-                  totalExpense) /
+                  currentMonthFixedExpense -
+                  currentMonthVariableExpense) /
                   totalIncome) *
                   100
               )
@@ -466,7 +525,7 @@ const totalExpense = selectedTransactions
               100,
               Math.round(
                 (1 -
-                  totalExpense /
+                  currentMonthVariableExpense /
                     totalIncome) *
                   100
               )
@@ -479,9 +538,10 @@ const totalExpense = selectedTransactions
    Based on actual transaction history
 ============================================================ */
 
-const expenseTransactions = transactions.filter(
+const expenseTransactions = selectedTransactions.filter(
   (t) =>
     t.type === 'expense' &&
+    t.expenseType !== 'fixed' &&
     Number(t.amount || 0) > 0
 );
 
@@ -703,7 +763,7 @@ if (expenseTransactions.length > 0) {
       insights.push({
         type: 'warning',
         title: `${topCategory.category} is your top spending category`,
-        detail: `${topCategory.category} accounts for ${topCategory.percentage}% of your total expenses.`,
+        detail: `${topCategory.category} accounts for ${topCategory.percentage}% of your variable expenses.`,
       });
     }
 
@@ -775,13 +835,6 @@ if (expenseTransactions.length > 0) {
   CASHFLOW FORECAST
 ============================================================ */
 
-const now = new Date();
-
-const isCurrentMonth =
-  selectedPeriod.type === 'month' &&
-  selectedPeriod.month === now.getMonth() &&
-  selectedPeriod.year === now.getFullYear();
-
 /*
  * Forecast is only meaningful for the current month.
  * Previous months are already completed, so we show
@@ -791,8 +844,9 @@ const isCurrentMonth =
 const forecastDays = Math.max(daysElapsed, 1);
 
 const averageDailyExpense =
-  isCurrentMonth && currentMonthExpense > 0
-    ? currentMonthExpense / forecastDays
+  isCurrentMonth &&
+  currentMonthVariableExpense > 0
+    ? currentMonthVariableExpense / forecastDays
     : 0;
 
 const projectedRemainingExpense =
@@ -837,21 +891,38 @@ const forecastMessage =
     ? 'Your current spending rate suggests a low month-end balance. Consider reducing discretionary spending.'
     : 'Your current spending rate looks manageable for the rest of the month.';
     /* ============================================================
-      RUN-OUT WARNING
+      VARIABLE SPENDING ANALYSIS
+      Fixed expenses are excluded from discretionary spending rate.
     ============================================================ */
 
-    const averageDailySpend =
-      daysElapsed > 0
-        ? currentMonthExpense /
-          daysElapsed
-        : 0;
+/*
+  Average daily variable spending.
 
-   const runOutDays =
-  averageDailySpend > 0 &&
+  Example:
+  Rent     = ₹4,000 fixed
+  Mess     = ₹3,200 fixed
+  Shopping = ₹1,000 variable
+
+  Average/day is calculated from ₹1,000,
+  NOT ₹8,200.
+*/
+const averageDailyVariableSpend =
+  daysElapsed > 0
+    ? currentMonthVariableExpense /
+      daysElapsed
+    : 0;
+
+/*
+  Run-out is based on discretionary/variable
+  spending behaviour rather than unavoidable
+  fixed commitments.
+*/
+const runOutDays =
+  averageDailyVariableSpend > 0 &&
   currentMonthBalance > 0
     ? Math.round(
         (currentMonthBalance /
-          averageDailySpend) *
+          averageDailyVariableSpend) *
           10
       ) / 10
     : 0;
@@ -1147,7 +1218,7 @@ const forecastMessage =
                 )}{' '}
                 balance · ₹
                 {Math.round(
-                  averageDailySpend
+                  averageDailyVariableSpend
                 ).toLocaleString(
                   'en-IN'
                 )}
@@ -1222,8 +1293,8 @@ const forecastMessage =
               <ForecastCard
   label={
     isCurrentMonth
-      ? 'Expected Remaining'
-      : 'Remaining'
+      ? 'Expected Variable Spend'
+      : 'Variable Spend'
   }
   value={projectedRemainingExpense}
 />
@@ -1729,7 +1800,7 @@ const forecastMessage =
                 <p className="text-xs text-gray-400 leading-relaxed">
 
                   {topCategory
-                    ? `Your highest spending category is ${topCategory.category} at ${topCategory.percentage}% of total expenses.`
+                    ? `Your highest discretionary category is ${topCategory.category} at ${topCategory.percentage}% of variable expenses.`
                     : 'Add transactions to generate your financial summary.'}
 
                 </p>
@@ -1929,7 +2000,7 @@ const forecastMessage =
     value,
     color,
   }: {
-    icon: React.ReactNode;
+    icon: ReactNode;
     label: string;
     value: string;
     color: string;

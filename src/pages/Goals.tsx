@@ -4,7 +4,6 @@ import {
   Plus,
   X,
   Trash2,
-  AlertTriangle,
   Check,
   Wallet,
 } from 'lucide-react';
@@ -12,10 +11,7 @@ import {
 import { Reveal } from '@/lib/animations';
 import { supabase } from '@/lib/supabase';
 
-type GoalStatus =
-  | 'on-track'
-  | 'challenging'
-  | 'completed';
+type GoalStatus = 'on-track' | 'challenging' | 'completed';
 
 type Goal = {
   id: string;
@@ -30,44 +26,63 @@ type Goal = {
   progress: number;
 };
 
+/* ============================================================
+   HELPERS
+   ============================================================ */
+
 function calculateProgress(
   targetAmount: number,
   savedAmount: number
-) {
-  if (targetAmount <= 0) return 0;
+): number {
+  if (!Number.isFinite(targetAmount) || targetAmount <= 0) {
+    return 0;
+  }
+
+  const safeSaved = Math.max(0, savedAmount);
 
   return Math.min(
     100,
-    Math.round(
-      (savedAmount / targetAmount) * 100
+    Math.round((safeSaved / targetAmount) * 100)
+  );
+}
+
+function getDaysRemaining(deadline: string): number {
+  const today = new Date();
+  const target = new Date(`${deadline}T23:59:59`);
+
+  if (Number.isNaN(target.getTime())) {
+    return 1;
+  }
+
+  const diff =
+    target.getTime() - today.getTime();
+
+  return Math.max(
+    1,
+    Math.ceil(
+      diff / (1000 * 60 * 60 * 24)
     )
   );
 }
 
-function calculateRequiredMonthly(
+function calculateRequiredDaily(
   targetAmount: number,
   savedAmount: number,
   deadline: string
-) {
+): number {
   const remaining = Math.max(
     0,
     targetAmount - savedAmount
   );
 
-  if (remaining <= 0) return 0;
+  if (remaining <= 0) {
+    return 0;
+  }
 
-  const today = new Date();
-  const target = new Date(deadline);
-
-  const months =
-    (target.getFullYear() -
-      today.getFullYear()) *
-      12 +
-    (target.getMonth() -
-      today.getMonth());
+  const days = getDaysRemaining(deadline);
 
   return Math.ceil(
-    remaining / Math.max(1, months)
+    remaining / days
   );
 }
 
@@ -75,26 +90,17 @@ function calculateRequiredWeekly(
   targetAmount: number,
   savedAmount: number,
   deadline: string
-) {
+): number {
   const remaining = Math.max(
     0,
     targetAmount - savedAmount
   );
 
-  if (remaining <= 0) return 0;
+  if (remaining <= 0) {
+    return 0;
+  }
 
-  const today = new Date();
-  const target = new Date(deadline);
-
-  const days = Math.max(
-    1,
-    Math.ceil(
-      (target.getTime() -
-        today.getTime()) /
-        (1000 * 60 * 60 * 24)
-    )
-  );
-
+  const days = getDaysRemaining(deadline);
   const weeks = Math.max(
     1,
     Math.ceil(days / 7)
@@ -105,32 +111,38 @@ function calculateRequiredWeekly(
   );
 }
 
-function calculateRequiredDaily(
+function calculateRequiredMonthly(
   targetAmount: number,
   savedAmount: number,
   deadline: string
-) {
+): number {
   const remaining = Math.max(
     0,
     targetAmount - savedAmount
   );
 
-  if (remaining <= 0) return 0;
+  if (remaining <= 0) {
+    return 0;
+  }
 
   const today = new Date();
-  const target = new Date(deadline);
+  const target = new Date(`${deadline}T23:59:59`);
 
-  const days = Math.max(
-    1,
-    Math.ceil(
-      (target.getTime() -
-        today.getTime()) /
-        (1000 * 60 * 60 * 24)
-    )
-  );
+  if (Number.isNaN(target.getTime())) {
+    return remaining;
+  }
 
+  const months =
+    (target.getFullYear() -
+      today.getFullYear()) *
+      12 +
+    (target.getMonth() -
+      today.getMonth());
+
+  // Same-month or overdue goals need the remaining amount
+  // rather than dividing by zero/negative months.
   return Math.ceil(
-    remaining / days
+    remaining / Math.max(1, months)
   );
 }
 
@@ -146,20 +158,22 @@ function calculateStatus(
     return 'completed';
   }
 
-  const progress =
-    calculateProgress(
-      targetAmount,
-      savedAmount
-    );
+  const progress = calculateProgress(
+    targetAmount,
+    savedAmount
+  );
 
   const today = new Date();
-  const target = new Date(deadline);
+  const target = new Date(`${deadline}T23:59:59`);
 
-  const daysRemaining = Math.ceil(
-    (target.getTime() -
-      today.getTime()) /
-      (1000 * 60 * 60 * 24)
-  );
+  const daysRemaining =
+    !deadline || Number.isNaN(target.getTime())
+      ? 1
+      : Math.ceil(
+          (target.getTime() -
+            today.getTime()) /
+            (1000 * 60 * 60 * 24)
+        );
 
   if (
     daysRemaining <= 0 &&
@@ -175,36 +189,44 @@ function calculateStatus(
   return 'challenging';
 }
 
-function normalizeGoal(
-  goal: any
-): Goal {
-  const targetAmount =
-    Number(goal.targetAmount || 0);
+/* ============================================================
+   NORMALIZE GOAL
 
-  const savedAmount =
-    Number(goal.savedAmount || 0);
+   IMPORTANT:
+   There is NO default/mock goal here.
+   If a goal does not exist, it is NOT created automatically.
+   ============================================================ */
+
+function normalizeGoal(goal: any): Goal {
+  const targetAmount = Math.max(
+    0,
+    Number(goal?.targetAmount) || 0
+  );
+
+  const savedAmount = Math.max(
+    0,
+    Number(goal?.savedAmount) || 0
+  );
 
   const deadline =
-    goal.deadline ||
-    new Date(
-      Date.now() +
-        180 *
-          24 *
-          60 *
-          60 *
-          1000
-    )
-      .toISOString()
-      .split('T')[0];
+    typeof goal?.deadline === 'string' &&
+    goal.deadline.length > 0
+      ? goal.deadline
+      : '';
 
   return {
     id:
-      goal.id ||
-      `${Date.now()}-${Math.random()}`,
+      typeof goal?.id === 'string' &&
+      goal.id.length > 0
+        ? goal.id
+        : `${Date.now()}-${Math.random()
+            .toString(36)
+            .slice(2)}`,
 
     name:
-      goal.name ||
-      'Untitled Goal',
+      typeof goal?.name === 'string'
+        ? goal.name
+        : '',
 
     targetAmount,
 
@@ -213,25 +235,31 @@ function normalizeGoal(
     deadline,
 
     requiredMonthly:
-      calculateRequiredMonthly(
-        targetAmount,
-        savedAmount,
-        deadline
-      ),
+      deadline
+        ? calculateRequiredMonthly(
+            targetAmount,
+            savedAmount,
+            deadline
+          )
+        : 0,
 
     requiredWeekly:
-      calculateRequiredWeekly(
-        targetAmount,
-        savedAmount,
-        deadline
-      ),
+      deadline
+        ? calculateRequiredWeekly(
+            targetAmount,
+            savedAmount,
+            deadline
+          )
+        : 0,
 
     requiredDaily:
-      calculateRequiredDaily(
-        targetAmount,
-        savedAmount,
-        deadline
-      ),
+      deadline
+        ? calculateRequiredDaily(
+            targetAmount,
+            savedAmount,
+            deadline
+          )
+        : 0,
 
     progress:
       calculateProgress(
@@ -240,13 +268,19 @@ function normalizeGoal(
       ),
 
     status:
-      calculateStatus(
-        targetAmount,
-        savedAmount,
-        deadline
-      ),
+      deadline
+        ? calculateStatus(
+            targetAmount,
+            savedAmount,
+            deadline
+          )
+        : 'challenging',
   };
 }
+
+/* ============================================================
+   GOALS PAGE
+   ============================================================ */
 
 export function GoalsPage() {
   const [userId, setUserId] =
@@ -281,19 +315,26 @@ export function GoalsPage() {
 
   const [savingDate, setSavingDate] =
     useState(
-      new Date()
-        .toISOString()
-        .split('T')[0]
+      (() => {
+        const date = new Date();
+        const year = date.getFullYear();
+        const month = String(
+          date.getMonth() + 1
+        ).padStart(2, '0');
+        const day = String(
+          date.getDate()
+        ).padStart(2, '0');
+
+        return `${year}-${month}-${day}`;
+      })()
     );
 
   const [deleteGoalId, setDeleteGoalId] =
     useState<string | null>(null);
 
-  /*
-   * ============================================================
-   * GET CURRENT USER
-   * ============================================================
-   */
+  /* ============================================================
+     GET CURRENT SUPABASE USER
+     ============================================================ */
 
   useEffect(() => {
     let mounted = true;
@@ -302,9 +343,16 @@ export function GoalsPage() {
       try {
         const {
           data: { user },
+          error,
         } = await supabase.auth.getUser();
 
-        if (!mounted) return;
+        if (error) {
+          throw error;
+        }
+
+        if (!mounted) {
+          return;
+        }
 
         if (!user) {
           setUserId(null);
@@ -335,11 +383,9 @@ export function GoalsPage() {
     };
   }, []);
 
-  /*
-   * ============================================================
-   * LOAD ONLY CURRENT USER'S GOALS
-   * ============================================================
-   */
+  /* ============================================================
+     LOAD GOALS FOR CURRENT USER ONLY
+     ============================================================ */
 
   useEffect(() => {
     if (!userId) {
@@ -358,44 +404,69 @@ export function GoalsPage() {
 
     try {
       /*
-       * IMPORTANT:
-       * Every account has its own storage key.
-       *
-       * Example:
-       * smartspend_goals_google-user-1
-       * smartspend_goals_google-user-2
-       */
+        CRITICAL:
 
-      const key =
+        Every account gets its own key.
+
+        User A:
+        smartspend_goals_USER_A
+
+        User B:
+        smartspend_goals_USER_B
+
+        There is NO:
+        - mockGoals
+        - default goal
+        - global goals key
+        - fallback goal
+      */
+
+      const storageKey =
         `smartspend_goals_${currentUserId}`;
 
       const stored =
-        localStorage.getItem(key);
+        localStorage.getItem(storageKey);
 
       /*
-       * No data = EMPTY.
-       *
-       * We NEVER use mockGoals here.
-       * We NEVER use old global storage keys.
-       */
+        Brand-new account:
+
+        No storage entry = EMPTY GOALS.
+
+        We do NOT create a default goal.
+        We do NOT create ₹50,000.
+      */
 
       if (!stored) {
         setGoals([]);
         return;
       }
 
-      const parsed =
-        JSON.parse(stored);
+      const parsed = JSON.parse(stored);
 
       if (!Array.isArray(parsed)) {
         setGoals([]);
         return;
       }
 
-      const normalized =
-        parsed.map(normalizeGoal);
+      /*
+        Remove invalid/corrupted entries.
+      */
 
-      setGoals(normalized);
+      const validGoals = parsed
+        .filter(
+          (goal) =>
+            goal &&
+            typeof goal === 'object'
+        )
+        .map(normalizeGoal)
+        .filter(
+          (goal) =>
+            goal.name.trim() !== '' &&
+            goal.targetAmount > 0 &&
+            goal.deadline !== ''
+        );
+
+      setGoals(validGoals);
     } catch (error) {
       console.error(
         'Failed to load goals:',
@@ -408,11 +479,9 @@ export function GoalsPage() {
     }
   }
 
-  /*
-   * ============================================================
-   * SAVE CURRENT USER'S GOALS
-   * ============================================================
-   */
+  /* ============================================================
+     SAVE GOALS
+     ============================================================ */
 
   useEffect(() => {
     if (
@@ -423,11 +492,11 @@ export function GoalsPage() {
     }
 
     try {
-      const key =
+      const storageKey =
         `smartspend_goals_${userId}`;
 
       localStorage.setItem(
-        key,
+        storageKey,
         JSON.stringify(goals)
       );
     } catch (error) {
@@ -442,20 +511,29 @@ export function GoalsPage() {
     loadingGoals,
   ]);
 
-  /*
-   * ============================================================
-   * CREATE GOAL
-   * ============================================================
-   */
+  /* ============================================================
+     CREATE GOAL
+     ============================================================ */
 
   function handleCreateGoal() {
-    if (!userId) return;
+    if (!userId) {
+      alert(
+        'Please login before creating a goal.'
+      );
+      return;
+    }
 
     const name =
       goalName.trim();
 
     const target =
       Number(targetAmount);
+
+    const initialSaved =
+      Math.max(
+        0,
+        Number(savedAmount) || 0
+      );
 
     if (!name) {
       alert(
@@ -481,16 +559,19 @@ export function GoalsPage() {
       return;
     }
 
-    const initialSaved =
-      Math.max(
-        0,
-        Number(savedAmount) || 0
+    if (initialSaved > target) {
+      alert(
+        'Already saved amount cannot be greater than the target amount.'
       );
+      return;
+    }
 
-    const goal: Goal =
+    const goal =
       normalizeGoal({
         id:
-          `${Date.now()}-${Math.random()}`,
+          `${Date.now()}-${Math.random()
+            .toString(36)
+            .slice(2)}`,
 
         name,
 
@@ -504,10 +585,12 @@ export function GoalsPage() {
           targetDate,
       });
 
-    setGoals((previous) => [
-      goal,
-      ...previous,
-    ]);
+    setGoals(
+      (previous) => [
+        goal,
+        ...previous,
+      ]
+    );
 
     setGoalName('');
     setTargetAmount('');
@@ -516,40 +599,48 @@ export function GoalsPage() {
     setShowCreate(false);
   }
 
-  /*
-   * ============================================================
-   * DELETE GOAL
-   * ============================================================
-   */
+  /* ============================================================
+     DELETE GOAL
+     ============================================================ */
 
- function handleDeleteGoal(id: string) {
-  setDeleteGoalId(id);
-}
-
-function confirmDeleteGoal() {
-  if (!deleteGoalId) return;
-
-  setGoals((previous) =>
-    previous.filter(
-      (goal) => goal.id !== deleteGoalId
-    )
-  );
-
-  if (savingGoal?.id === deleteGoalId) {
-    setSavingGoal(null);
+  function handleDeleteGoal(
+    id: string
+  ) {
+    setDeleteGoalId(id);
   }
 
-  setDeleteGoalId(null);
-}
+  function confirmDeleteGoal() {
+    if (!deleteGoalId) {
+      return;
+    }
 
-  /*
-   * ============================================================
-   * ADD SAVINGS TO GOAL
-   * ============================================================
-   */
+    setGoals(
+      (previous) =>
+        previous.filter(
+          (goal) =>
+            goal.id !==
+            deleteGoalId
+        )
+    );
+
+    if (
+      savingGoal?.id ===
+      deleteGoalId
+    ) {
+      setSavingGoal(null);
+    }
+
+    setDeleteGoalId(null);
+  }
+
+  /* ============================================================
+     ADD SAVINGS
+     ============================================================ */
 
   function handleAddSaving() {
-    if (!savingGoal) return;
+    if (!savingGoal) {
+      return;
+    }
 
     const amount =
       Number(savingAmount);
@@ -564,34 +655,84 @@ function confirmDeleteGoal() {
       return;
     }
 
-    setGoals((previous) =>
-      previous.map((goal) => {
-        if (
-          goal.id !==
-          savingGoal.id
-        ) {
-          return goal;
-        }
+    if (!savingDate) {
+      alert(
+        'Please select a date.'
+      );
+      return;
+    }
 
-        return normalizeGoal({
-          ...goal,
+    const newSavedAmount =
+      Math.max(
+        0,
+        savingGoal.savedAmount +
+          amount
+      );
 
-          savedAmount:
-            goal.savedAmount +
-            amount,
-        });
-      })
+    if (
+      !Number.isFinite(newSavedAmount)
+    ) {
+      alert(
+        'Please enter a valid saving amount.'
+      );
+      return;
+    }
+
+    if (
+      newSavedAmount >
+      savingGoal.targetAmount
+    ) {
+      alert(
+        `You only need ₹${Math.max(
+          0,
+          savingGoal.targetAmount -
+            savingGoal.savedAmount
+        ).toLocaleString('en-IN')} more for this goal.`
+      );
+      return;
+    }
+
+    setGoals(
+      (previous) =>
+        previous.map(
+          (goal) => {
+            if (
+              goal.id !==
+              savingGoal.id
+            ) {
+              return goal;
+            }
+
+            return normalizeGoal({
+              ...goal,
+              savedAmount:
+                newSavedAmount,
+            });
+          }
+        )
     );
 
     setSavingAmount('');
+    setSavingDate(
+      (() => {
+        const date = new Date();
+        const year = date.getFullYear();
+        const month = String(
+          date.getMonth() + 1
+        ).padStart(2, '0');
+        const day = String(
+          date.getDate()
+        ).padStart(2, '0');
+
+        return `${year}-${month}-${day}`;
+      })()
+    );
     setSavingGoal(null);
   }
 
-  /*
-   * ============================================================
-   * ACTIVE / COMPLETED
-   * ============================================================
-   */
+  /* ============================================================
+     ACTIVE / COMPLETED
+     ============================================================ */
 
   const activeGoals =
     useMemo(
@@ -615,11 +756,9 @@ function confirmDeleteGoal() {
       [goals]
     );
 
-  /*
-   * ============================================================
-   * LOADING
-   * ============================================================
-   */
+  /* ============================================================
+     LOADING
+     ============================================================ */
 
   if (loadingGoals) {
     return (
@@ -645,30 +784,31 @@ function confirmDeleteGoal() {
     );
   }
 
-  /*
-   * ============================================================
-   * UI
-   * ============================================================
-   */
+  /* ============================================================
+     UI
+     ============================================================ */
 
   return (
     <div className="space-y-6 pb-8">
 
       {/* HEADER */}
+
       <Reveal>
         <div className="flex items-center justify-between gap-4">
 
           <div>
             <div className="flex items-center gap-2">
+
               <Target className="w-5 h-5 text-emerald-400" />
 
               <h1 className="text-2xl font-bold text-white">
                 Goals
               </h1>
+
             </div>
 
             <p className="text-sm text-gray-500 mt-1">
-              Track and evaluate your savings targets
+              Track goals, add savings and follow your automatic plan
             </p>
           </div>
 
@@ -686,7 +826,8 @@ function confirmDeleteGoal() {
         </div>
       </Reveal>
 
-      {/* CREATE FORM */}
+      {/* CREATE GOAL */}
+
       {showCreate && (
         <Reveal>
           <div className="glass-card p-5">
@@ -704,10 +845,12 @@ function confirmDeleteGoal() {
               </div>
 
               <button
+                type="button"
                 onClick={() =>
                   setShowCreate(false)
                 }
                 className="p-2 text-gray-500 hover:text-white"
+                aria-label="Close create goal"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -717,6 +860,7 @@ function confirmDeleteGoal() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
               {/* NAME */}
+
               <div>
                 <label className="metric-label">
                   Goal Name
@@ -735,6 +879,7 @@ function confirmDeleteGoal() {
               </div>
 
               {/* TARGET */}
+
               <div>
                 <label className="metric-label">
                   Target Amount
@@ -763,6 +908,7 @@ function confirmDeleteGoal() {
               </div>
 
               {/* SAVED */}
+
               <div>
                 <label className="metric-label">
                   Already Saved
@@ -791,6 +937,7 @@ function confirmDeleteGoal() {
               </div>
 
               {/* DEADLINE */}
+
               <div>
                 <label className="metric-label">
                   Target Date
@@ -799,6 +946,11 @@ function confirmDeleteGoal() {
                 <input
                   type="date"
                   value={targetDate}
+                  min={
+                    new Date()
+                      .toISOString()
+                      .split('T')[0]
+                  }
                   onChange={(e) =>
                     setTargetDate(
                       e.target.value
@@ -813,6 +965,7 @@ function confirmDeleteGoal() {
             <div className="flex justify-end gap-3 mt-5">
 
               <button
+                type="button"
                 onClick={() =>
                   setShowCreate(false)
                 }
@@ -822,6 +975,7 @@ function confirmDeleteGoal() {
               </button>
 
               <button
+                type="button"
                 onClick={
                   handleCreateGoal
                 }
@@ -837,6 +991,7 @@ function confirmDeleteGoal() {
       )}
 
       {/* ACTIVE GOALS */}
+
       <Reveal delay={50}>
         <div>
 
@@ -897,6 +1052,7 @@ function confirmDeleteGoal() {
       </Reveal>
 
       {/* COMPLETED */}
+
       {completedGoals.length > 0 && (
         <Reveal delay={100}>
           <div>
@@ -928,7 +1084,8 @@ function confirmDeleteGoal() {
         </Reveal>
       )}
 
-      {/* ADD SAVING MODAL */}
+      {/* ADD SAVINGS MODAL */}
+
       {savingGoal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm px-4">
 
@@ -947,10 +1104,12 @@ function confirmDeleteGoal() {
               </div>
 
               <button
+                type="button"
                 onClick={() =>
                   setSavingGoal(null)
                 }
                 className="p-2 text-gray-500 hover:text-white"
+                aria-label="Close savings modal"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -958,6 +1117,7 @@ function confirmDeleteGoal() {
             </div>
 
             <div>
+
               <label className="metric-label">
                 Amount
               </label>
@@ -986,6 +1146,7 @@ function confirmDeleteGoal() {
             </div>
 
             <div className="mt-4">
+
               <label className="metric-label">
                 Date
               </label>
@@ -1000,11 +1161,13 @@ function confirmDeleteGoal() {
                 }
                 className="w-full mt-2 px-3 py-3 bg-white/[0.03] border border-white/[0.06] rounded-lg text-white focus:outline-none focus:border-emerald-400/30"
               />
+
             </div>
 
             <div className="flex justify-end gap-3 mt-5">
 
               <button
+                type="button"
                 onClick={() =>
                   setSavingGoal(null)
                 }
@@ -1014,6 +1177,7 @@ function confirmDeleteGoal() {
               </button>
 
               <button
+                type="button"
                 onClick={
                   handleAddSaving
                 }
@@ -1028,23 +1192,35 @@ function confirmDeleteGoal() {
         </div>
       )}
 
-      {/* DELETE GOAL CONFIRMATION */}
+      {/* DELETE CONFIRMATION */}
+
       {deleteGoalId && (
         <div
           className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm"
-          onClick={() => setDeleteGoalId(null)}
+          onClick={() =>
+            setDeleteGoalId(null)
+          }
         >
+
           <div
             className="w-full max-w-md rounded-2xl border border-white/10 bg-[#111514] p-6 shadow-2xl"
-            onClick={(event) => event.stopPropagation()}
+            onClick={(event) =>
+              event.stopPropagation()
+            }
           >
+
             <div className="flex items-start justify-between gap-4">
+
               <div className="flex items-center gap-3">
+
                 <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-red-500/10">
+
                   <Trash2 className="h-5 w-5 text-red-400" />
+
                 </div>
 
                 <div>
+
                   <h3 className="text-lg font-semibold text-white">
                     Delete this goal?
                   </h3>
@@ -1052,29 +1228,39 @@ function confirmDeleteGoal() {
                   <p className="mt-1 text-sm text-gray-400">
                     This action cannot be undone.
                   </p>
+
                 </div>
+
               </div>
 
               <button
                 type="button"
-                onClick={() => setDeleteGoalId(null)}
+                onClick={() =>
+                  setDeleteGoalId(null)
+                }
                 className="rounded-lg p-2 text-gray-400 transition hover:bg-white/5 hover:text-white"
                 aria-label="Close delete confirmation"
               >
                 <X className="h-5 w-5" />
               </button>
+
             </div>
 
             <div className="mt-5 rounded-xl border border-red-500/10 bg-red-500/5 p-4">
+
               <p className="text-sm leading-6 text-gray-300">
                 Are you sure you want to permanently delete this goal?
               </p>
+
             </div>
 
             <div className="mt-6 flex gap-3">
+
               <button
                 type="button"
-                onClick={() => setDeleteGoalId(null)}
+                onClick={() =>
+                  setDeleteGoalId(null)
+                }
                 className="flex-1 rounded-xl border border-white/10 px-4 py-3 text-sm font-medium text-gray-300 transition hover:bg-white/5 hover:text-white"
               >
                 Cancel
@@ -1082,12 +1268,16 @@ function confirmDeleteGoal() {
 
               <button
                 type="button"
-                onClick={confirmDeleteGoal}
+                onClick={
+                  confirmDeleteGoal
+                }
                 className="flex-1 rounded-xl bg-red-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-red-600"
               >
                 Delete Goal
               </button>
+
             </div>
+
           </div>
         </div>
       )}
@@ -1096,11 +1286,9 @@ function confirmDeleteGoal() {
   );
 }
 
-/*
- * ============================================================
- * GOAL CARD
- * ============================================================
- */
+/* ============================================================
+   GOAL CARD
+   ============================================================ */
 
 function GoalCard({
   goal,
@@ -1123,7 +1311,7 @@ function GoalCard({
       ? 'Completed'
       : goal.status === 'on-track'
       ? 'On track'
-      : 'Needs attention';
+      : 'Challenging';
 
   const statusClass =
     goal.status === 'completed'
@@ -1132,15 +1320,26 @@ function GoalCard({
       ? 'text-blue-400 bg-blue-400/10'
       : 'text-amber-400 bg-amber-400/10';
 
+  const daysRemaining =
+    goal.deadline
+      ? getDaysRemaining(
+          goal.deadline
+        )
+      : 0;
+
   return (
     <div className="glass-card p-5">
+
+      {/* HEADER */}
 
       <div className="flex items-start justify-between gap-3">
 
         <div className="flex items-start gap-3">
 
           <div className="w-10 h-10 rounded-xl bg-emerald-400/10 flex items-center justify-center flex-shrink-0">
+
             <Target className="w-5 h-5 text-emerald-400" />
+
           </div>
 
           <div>
@@ -1151,11 +1350,13 @@ function GoalCard({
 
             <p className="text-xs text-gray-500 mt-0.5">
               Target:{' '}
-              {new Date(
-                goal.deadline
-              ).toLocaleDateString(
-                'en-IN'
-              )}
+              {goal.deadline
+                ? new Date(
+                    `${goal.deadline}T12:00:00`
+                  ).toLocaleDateString(
+                    'en-IN'
+                  )
+                : 'Not set'}
             </p>
 
           </div>
@@ -1163,9 +1364,11 @@ function GoalCard({
         </div>
 
         <button
+          type="button"
           onClick={onDelete}
           className="p-2 text-gray-600 hover:text-red-400 transition-colors"
           title="Delete goal"
+          aria-label="Delete goal"
         >
           <Trash2 className="w-4 h-4" />
         </button>
@@ -1173,15 +1376,19 @@ function GoalCard({
       </div>
 
       {/* STATUS */}
+
       <div className="mt-4">
+
         <span
           className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${statusClass}`}
         >
           {statusText}
         </span>
+
       </div>
 
       {/* PROGRESS */}
+
       <div className="mt-5">
 
         <div className="flex items-center justify-between mb-2">
@@ -1213,9 +1420,11 @@ function GoalCard({
       </div>
 
       {/* AMOUNTS */}
+
       <div className="grid grid-cols-2 gap-4 mt-5">
 
         <div>
+
           <p className="metric-label">
             Saved
           </p>
@@ -1226,9 +1435,11 @@ function GoalCard({
               'en-IN'
             )}
           </p>
+
         </div>
 
         <div>
+
           <p className="metric-label">
             Target
           </p>
@@ -1239,11 +1450,13 @@ function GoalCard({
               'en-IN'
             )}
           </p>
+
         </div>
 
       </div>
 
       {/* REMAINING */}
+
       {goal.status !== 'completed' && (
         <div className="mt-4 flex items-start gap-2 bg-white/[0.02] border border-white/[0.05] rounded-xl p-3">
 
@@ -1268,10 +1481,12 @@ function GoalCard({
       )}
 
       {/* REQUIRED SAVING */}
+
       {goal.status !== 'completed' && (
         <div className="grid grid-cols-3 gap-2 mt-4">
 
           <div className="bg-white/[0.02] rounded-lg p-2.5 text-center">
+
             <p className="text-[10px] text-gray-600 uppercase">
               Daily
             </p>
@@ -1282,9 +1497,11 @@ function GoalCard({
                 'en-IN'
               )}
             </p>
+
           </div>
 
           <div className="bg-white/[0.02] rounded-lg p-2.5 text-center">
+
             <p className="text-[10px] text-gray-600 uppercase">
               Weekly
             </p>
@@ -1295,9 +1512,11 @@ function GoalCard({
                 'en-IN'
               )}
             </p>
+
           </div>
 
           <div className="bg-white/[0.02] rounded-lg p-2.5 text-center">
+
             <p className="text-[10px] text-gray-600 uppercase">
               Monthly
             </p>
@@ -1308,14 +1527,29 @@ function GoalCard({
                 'en-IN'
               )}
             </p>
+
           </div>
 
         </div>
       )}
 
+      {/* TIME */}
+
+      {goal.status !== 'completed' &&
+        goal.deadline && (
+          <div className="mt-4 text-xs text-gray-500">
+            {daysRemaining} day
+            {daysRemaining === 1
+              ? ''
+              : 's'} remaining
+          </div>
+        )}
+
       {/* ADD SAVING */}
+
       {goal.status !== 'completed' && (
         <button
+          type="button"
           onClick={onAddSaving}
           className="w-full mt-4 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-white/[0.04] border border-white/[0.06] text-sm font-semibold text-gray-300 hover:text-white hover:bg-white/[0.07] transition-all"
         >
@@ -1325,6 +1559,7 @@ function GoalCard({
       )}
 
       {/* COMPLETED */}
+
       {goal.status === 'completed' && (
         <div className="mt-4 flex items-center gap-2 text-emerald-400 text-sm font-semibold">
 

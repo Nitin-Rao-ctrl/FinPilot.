@@ -171,6 +171,26 @@ export function WeeklyReportPage() {
     (t) => t.type === 'income'
   );
 
+  // Fixed commitments are real cash outflow, but they should
+  // not be treated as discretionary/personal spending.
+  const fixedExpenses = expenses.filter(
+    (t) => t.expenseType === 'fixed'
+  );
+
+  const variableExpenses = expenses.filter(
+    (t) => t.expenseType !== 'fixed'
+  );
+
+  const fixedSpending = fixedExpenses.reduce(
+    (sum, t) => sum + Number(t.amount || 0),
+    0
+  );
+
+  const variableSpending = variableExpenses.reduce(
+    (sum, t) => sum + Number(t.amount || 0),
+    0
+  );
+
   const spending = expenses.reduce(
     (sum, t) => sum + Number(t.amount || 0),
     0
@@ -189,7 +209,7 @@ export function WeeklyReportPage() {
 
   const categoryMap: Record<string, number> = {};
 
-  expenses.forEach((t) => {
+  variableExpenses.forEach((t) => {
     const category = t.category || 'Other';
 
     categoryMap[category] =
@@ -215,9 +235,9 @@ export function WeeklyReportPage() {
       : 0;
 
   const biggestCategoryPercentage =
-    spending > 0
+    variableSpending > 0
       ? Math.round(
-          (biggestCategoryAmount / spending) * 100
+          (biggestCategoryAmount / variableSpending) * 100
         )
       : 0;
 
@@ -242,11 +262,17 @@ export function WeeklyReportPage() {
   if (weekTransactions.length > 0 && spending === 0) {
     aiInsight =
       'You have no recorded expenses for this week. Keep tracking your spending to maintain accurate financial insights.';
-  } else if (spending > income && income > 0) {
+  } else if (
+    variableSpending > income &&
+    income > 0
+  ) {
     aiInsight =
-      'Your spending is currently higher than your income for this week. Consider reducing discretionary expenses.';
+      'Your discretionary spending is currently higher than your income for this week. Consider reducing variable expenses.';
   } else if (biggestCategory !== 'No spending') {
-    aiInsight = `${biggestCategory} is your biggest spending category this week, accounting for approximately ${biggestCategoryPercentage}% of your recorded expenses.`;
+    aiInsight = `${biggestCategory} is your biggest variable spending category this week, accounting for approximately ${biggestCategoryPercentage}% of your variable expenses.`;
+  } else if (fixedSpending > 0) {
+    aiInsight =
+      'Your recorded expenses for this week are fixed commitments. They are included in cash flow, but excluded from discretionary spending insights.';
   }
 
   // -----------------------------
@@ -262,7 +288,11 @@ export function WeeklyReportPage() {
               'en-IN'
             )} across ${expenses.length} expense transaction${
               expenses.length === 1 ? '' : 's'
-            } this week.`
+            } this week. ₹${fixedSpending.toLocaleString(
+              'en-IN'
+            )} was fixed and ₹${variableSpending.toLocaleString(
+              'en-IN'
+            )} was variable.`
           : 'No expense transactions were recorded this week.',
     },
 
@@ -291,10 +321,12 @@ export function WeeklyReportPage() {
     {
       heading: 'Recommendation',
       body:
-        spending > income && income > 0
-          ? 'Try keeping weekly expenses below your recorded income and review your highest spending category.'
+        variableSpending > income && income > 0
+          ? 'Try keeping weekly variable spending below your recorded income and review your highest discretionary category.'
           : biggestCategory !== 'No spending'
-          ? `Review your ${biggestCategory} expenses and look for opportunities to reduce unnecessary spending.`
+          ? `Review your ${biggestCategory} variable expenses and look for opportunities to reduce unnecessary spending.`
+          : fixedSpending > 0
+          ? 'Your recorded spending is primarily fixed commitments. Continue tracking variable expenses for useful recommendations.'
           : 'Continue recording income and expenses to receive more useful recommendations.',
     },
   ];
@@ -513,6 +545,35 @@ export function WeeklyReportPage() {
 
               </div>
 
+              {/* Fixed vs Variable */}
+              <div className="grid grid-cols-2 gap-3 mb-6">
+
+                <div className="bg-white/[0.02] rounded-xl p-3">
+                  <p className="metric-label">
+                    Fixed Commitments
+                  </p>
+                  <p className="text-lg font-bold text-white mt-1">
+                    ₹{fixedSpending.toLocaleString('en-IN')}
+                  </p>
+                  <p className="text-[10px] text-gray-600 mt-1">
+                    Included in cash flow, excluded from spending insights
+                  </p>
+                </div>
+
+                <div className="bg-white/[0.02] rounded-xl p-3">
+                  <p className="metric-label">
+                    Variable Spending
+                  </p>
+                  <p className="text-lg font-bold text-white mt-1">
+                    ₹{variableSpending.toLocaleString('en-IN')}
+                  </p>
+                  <p className="text-[10px] text-gray-600 mt-1">
+                    Used for discretionary analysis
+                  </p>
+                </div>
+
+              </div>
+
               {/* AI Insight */}
               <div className="bg-emerald-400/[0.03] border border-emerald-400/15 rounded-xl p-5">
 
@@ -531,6 +592,10 @@ export function WeeklyReportPage() {
                 </p>
 
               </div>
+
+              <p className="text-[10px] text-gray-600 mt-3">
+                Fixed commitments are excluded from this category analysis.
+              </p>
 
             </div>
 

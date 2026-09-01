@@ -24,8 +24,8 @@ import {
   RadialBar,
 } from 'recharts';
 
-import { useEffect, useState } from 'react';
-import { Reveal, CountUp } from '@/lib/animations';
+import { useEffect, useMemo, useState } from 'react';
+import { Reveal } from '@/lib/animations';
 import { supabase } from '@/lib/supabase';
 import {
   MonthSelector,
@@ -41,8 +41,33 @@ const PIE_COLORS = [
   '#065F46',
 ];
 
+type Transaction = {
+  _id?: string;
+  id?: string;
+  userId?: string;
+  type: 'income' | 'expense';
+  amount: number;
+  category?: string;
+  expenseType?: 'fixed' | 'variable' | string;
+  description?: string;
+  merchant?: string;
+  date?: string;
+};
+
+type CategoryBreakdown = {
+  category: string;
+  total: number;
+  percentage: number;
+};
+
+type InsightItem = {
+  type: 'positive' | 'warning' | 'danger';
+  title: string;
+  detail: string;
+};
+
 export function InsightsPage() {
-  const [transactions, setTransactions] = useState<any[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [showCategoryAnalysis, setShowCategoryAnalysis] =
     useState(false);
 
@@ -85,6 +110,10 @@ export function InsightsPage() {
       };
     });
 
+  /* ============================================================
+     SAVE SELECTED PERIOD
+  ============================================================ */
+
   useEffect(() => {
     localStorage.setItem(
       'finpilot_selected_period',
@@ -92,382 +121,565 @@ export function InsightsPage() {
     );
   }, [selectedPeriod]);
 
+  /* ============================================================
+     LOAD TRANSACTIONS
+  ============================================================ */
+
   useEffect(() => {
-  async function loadTransactions() {
-    try {
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser();
+    async function loadTransactions() {
+      try {
+        const {
+          data: { user },
+          error: userError,
+        } = await supabase.auth.getUser();
 
-      if (userError || !user) {
-        throw new Error('User is not logged in');
-      }
+        if (userError || !user) {
+          throw new Error('User is not logged in');
+        }
 
-      const response = await fetch(
-        `https://finpilot-backend-23iz.onrender.com/api/transactions?userId=${encodeURIComponent(
-          user.id
-        )}`
-      );
-
-      if (!response.ok) {
-        throw new Error(
-          `Transaction API returned ${response.status}`
+        const response = await fetch(
+          `https://finpilot-backend-23iz.onrender.com/api/transactions?userId=${encodeURIComponent(
+            user.id
+          )}`
         );
+
+        if (!response.ok) {
+          throw new Error(
+            `Transaction API returned ${response.status}`
+          );
+        }
+
+        const data = await response.json();
+
+        setTransactions(
+          Array.isArray(data) ? data : []
+        );
+      } catch (error) {
+        console.error(
+          'Error loading insights transactions:',
+          error
+        );
+
+        setTransactions([]);
+      }
+    }
+
+    loadTransactions();
+  }, []);
+
+  /* ============================================================
+     SELECTED PERIOD
+  ============================================================ */
+
+  const periodTransactions = useMemo(() => {
+    if (selectedPeriod.type === 'all') {
+      return transactions;
+    }
+
+    return transactions.filter((transaction) => {
+      if (!transaction.date) {
+        return false;
       }
 
-      const data = await response.json();
+      const date = new Date(transaction.date);
 
-      setTransactions(
-        Array.isArray(data) ? data : []
+      if (Number.isNaN(date.getTime())) {
+        return false;
+      }
+
+      return (
+        date.getFullYear() === selectedPeriod.year &&
+        date.getMonth() === selectedPeriod.month
       );
-    } catch (error) {
-      console.error(
-        'Error loading insights transactions:',
-        error
-      );
+    });
+  }, [transactions, selectedPeriod]);
 
-      setTransactions([]);
-    }
-  }
+  /* ============================================================
+     BASIC TRANSACTION GROUPS
+  ============================================================ */
 
-  loadTransactions();
-}, []);
-
-  // -----------------------------
-  // SELECTED PERIOD
-  // -----------------------------
-
-  const periodTransactions =
-    selectedPeriod.type === 'all'
-      ? transactions
-      : transactions.filter((t) => {
-          if (!t.date) return false;
-
-          const date = new Date(t.date);
-
-          if (Number.isNaN(date.getTime())) {
-            return false;
-          }
-
-          if (selectedPeriod.type !== 'month') {
-            return false;
-          }
-
-          return (
-            date.getFullYear() === selectedPeriod.year &&
-            date.getMonth() === selectedPeriod.month
-          );
-        });
-
-  // -----------------------------
-  // TRANSACTIONS
-  // -----------------------------
-
-  const expenses = periodTransactions.filter(
-    (t) => t.type === 'expense'
+  const expenses = useMemo(
+    () =>
+      periodTransactions.filter(
+        (transaction) =>
+          transaction.type === 'expense'
+      ),
+    [periodTransactions]
   );
 
-  const incomes = periodTransactions.filter(
-    (t) => t.type === 'income'
+  const incomes = useMemo(
+    () =>
+      periodTransactions.filter(
+        (transaction) =>
+          transaction.type === 'income'
+      ),
+    [periodTransactions]
   );
 
-  const totalExpense = expenses.reduce(
-    (sum, t) => sum + Number(t.amount || 0),
-    0
+  /* ============================================================
+     TOTALS
+  ============================================================ */
+
+  const totalExpense = useMemo(
+    () =>
+      expenses.reduce(
+        (sum, transaction) =>
+          sum + Number(transaction.amount || 0),
+        0
+      ),
+    [expenses]
   );
 
-  const totalIncome = incomes.reduce(
-    (sum, t) => sum + Number(t.amount || 0),
-    0
+  const totalIncome = useMemo(
+    () =>
+      incomes.reduce(
+        (sum, transaction) =>
+          sum + Number(transaction.amount || 0),
+        0
+      ),
+    [incomes]
   );
 
-  // -----------------------------
-  // CATEGORY BREAKDOWN
-  // -----------------------------
+  /* ============================================================
+     FIXED VS VARIABLE
 
-  const categoryMap: Record<string, number> = {};
+     FIXED:
+     - Rent
+     - Mess
+     - EMI
+     - Loan
+     - Other unavoidable commitments
 
-  expenses.forEach((t) => {
-    const category = t.category || 'Other';
+     VARIABLE:
+     - Shopping
+     - Food outside mess
+     - Entertainment
+     - Personal spending
+     - Other discretionary expenses
 
-    categoryMap[category] =
-      (categoryMap[category] || 0) +
-      Number(t.amount || 0);
-  });
+     Old transactions without expenseType are treated
+     as VARIABLE so existing data continues to work.
+  ============================================================ */
 
-  const categoryBreakdown = Object.entries(categoryMap).map(
-    ([category, total]) => ({
-      category,
-      total,
-      percentage:
-        totalExpense > 0
-          ? Math.round((total / totalExpense) * 100)
-          : 0,
-    })
+  const fixedExpenses = useMemo(
+    () =>
+      expenses.filter(
+        (transaction) =>
+          transaction.expenseType === 'fixed'
+      ),
+    [expenses]
   );
+
+  const variableExpenses = useMemo(
+    () =>
+      expenses.filter(
+        (transaction) =>
+          transaction.expenseType !== 'fixed'
+      ),
+    [expenses]
+  );
+
+  const totalFixedExpense = useMemo(
+    () =>
+      fixedExpenses.reduce(
+        (sum, transaction) =>
+          sum + Number(transaction.amount || 0),
+        0
+      ),
+    [fixedExpenses]
+  );
+
+  const totalVariableExpense = useMemo(
+    () =>
+      variableExpenses.reduce(
+        (sum, transaction) =>
+          sum + Number(transaction.amount || 0),
+        0
+      ),
+    [variableExpenses]
+  );
+
+  /* ============================================================
+     CATEGORY BREAKDOWN
+
+     IMPORTANT:
+     FIXED EXPENSES ARE COMPLETELY EXCLUDED.
+  ============================================================ */
+
+  const categoryBreakdown = useMemo<CategoryBreakdown[]>(() => {
+    const categoryMap: Record<string, number> = {};
+
+    variableExpenses.forEach((transaction) => {
+      const category =
+        transaction.category || 'Other';
+
+      categoryMap[category] =
+        (categoryMap[category] || 0) +
+        Number(transaction.amount || 0);
+    });
+
+    return Object.entries(categoryMap)
+      .map(([category, total]) => ({
+        category,
+        total,
+        percentage:
+          totalVariableExpense > 0
+            ? Math.round(
+                (total / totalVariableExpense) * 100
+              )
+            : 0,
+      }))
+      .sort((a, b) => b.total - a.total);
+  }, [variableExpenses, totalVariableExpense]);
 
   const topCategory =
     categoryBreakdown.length > 0
-      ? categoryBreakdown.reduce((a, b) =>
-          b.total > a.total ? b : a
-        )
+      ? categoryBreakdown[0]
       : null;
 
-  // -----------------------------
-  // DAILY SPENDING
-  // -----------------------------
+  /* ============================================================
+     DAILY VARIABLE SPENDING
 
-  const dailyMap: Record<string, number> = {};
+     FIXED EXPENSES NEVER ENTER THIS CALCULATION.
+  ============================================================ */
 
-  expenses.forEach((t) => {
-    const day = new Date(t.date)
-      .getDate()
-      .toString();
+  const dailySpendingTrend = useMemo(() => {
+    const dailyMap: Record<string, number> = {};
 
-    dailyMap[day] =
-      (dailyMap[day] || 0) +
-      Number(t.amount || 0);
-  });
-
-  const dailySpendingTrend = Object.entries(
-    dailyMap
-  ).map(([day, amount]) => ({
-    day,
-    amount,
-  }));
-
-  // -----------------------------
-  // MONTHLY COMPARISON
-  // -----------------------------
-
-  const monthlyMap: Record<
-    string,
-    {
-      income: number;
-      expense: number;
-    }
-  > = {};
-
-  transactions.forEach((t) => {
-    const month = new Date(t.date).toLocaleString(
-      'en-IN',
-      {
-        month: 'short',
+    variableExpenses.forEach((transaction) => {
+      if (!transaction.date) {
+        return;
       }
-    );
 
-    if (!monthlyMap[month]) {
-      monthlyMap[month] = {
-        income: 0,
-        expense: 0,
-      };
-    }
+      const date = new Date(transaction.date);
 
-    if (t.type === 'income') {
-      monthlyMap[month].income +=
-        Number(t.amount || 0);
-    } else {
-      monthlyMap[month].expense +=
-        Number(t.amount || 0);
-    }
-  });
+      if (Number.isNaN(date.getTime())) {
+        return;
+      }
 
-  const monthlyComparison = Object.entries(
-    monthlyMap
-  ).map(([month, data]) => ({
-    month,
-    ...data,
-  }));
+      const day = date.getDate().toString();
 
-  // -----------------------------
-  // AVERAGE PER DAY
-  // -----------------------------
-
-  const avgPerDay =
-    expenses.length > 0
-      ? Math.round(
-          totalExpense /
-            Math.max(
-              1,
-              dailySpendingTrend.length
-            )
-        )
-      : 0;
-      
-
-  // -----------------------------
-  // MONEY LEAKS
-  // -----------------------------
- // -----------------------------
-// SMART REDUCTION ANALYSIS
-// -----------------------------
-
-const fixedCategories = [
-  'Rent',
-  'EMI',
-  'Loan',
-  'Insurance',
-];
-
-function getRecommendedReduction(
-  category: string,
-  total: number,
-  transactionCount: number,
-  totalExpense: number
-) {
-  if (
-    total <= 0 ||
-    totalExpense <= 0 ||
-    fixedCategories.includes(category)
-  ) {
-    return 0;
-  }
-
-  const spendingShare =
-    total / totalExpense;
-
-  // Higher share = higher opportunity
-  const shareScore =
-    spendingShare * 100;
-
-  // More transactions = stronger repeated-spending signal
-  const frequencyScore =
-    Math.min(transactionCount * 2, 20);
-
-  // Combine spending share + frequency
-  const analysisScore =
-    shareScore + frequencyScore;
-
-  // Convert analysis into a practical
-  // reduction recommendation
-  if (analysisScore >= 50) {
-    return 25;
-  }
-
-  if (analysisScore >= 35) {
-    return 20;
-  }
-
-  if (analysisScore >= 20) {
-    return 15;
-  }
-
-  if (analysisScore >= 10) {
-    return 10;
-  }
-
-  return 5;
-}
- const moneyLeaks = categoryBreakdown
-  .filter(
-    (cat) =>
-      cat.total > 0 &&
-      !fixedCategories.includes(cat.category)
-  )
-  .slice(0, 3)
-  .map((cat) => {
-    const categoryTransactions =
-      expenses.filter(
-        (t) =>
-          (t.category || 'Other') ===
-          cat.category
-      );
-
-    const recommendedReduction =
-      getRecommendedReduction(
-        cat.category,
-        cat.total,
-        categoryTransactions.length,
-        totalExpense
-      );
-
-    return {
-      count: categoryTransactions.length,
-      category: cat.category,
-      merchant: cat.category,
-      total: cat.total,
-      average: Math.round(
-        cat.total /
-          Math.max(
-            1,
-            categoryTransactions.length
-          )
-      ),
-      reductionPercent: recommendedReduction,
-      potentialSavings: Math.round(
-        cat.total *
-          recommendedReduction /
-          100
-      ),
-    };
-  });
-
-  // -----------------------------
-  // SAVING SUGGESTIONS
-  // -----------------------------
-
- const savingSuggestions =
-  categoryBreakdown
-    .filter(
-      (cat) =>
-        cat.total > 0 &&
-        !fixedCategories.includes(cat.category)
-    )
-    .slice(0, 3)
-    .map((cat) => {
-      const categoryTransactions =
-        expenses.filter(
-          (t) =>
-            (t.category || 'Other') ===
-            cat.category
-        );
-
-      const reductionPercent =
-        getRecommendedReduction(
-          cat.category,
-          cat.total,
-          categoryTransactions.length,
-          totalExpense
-        );
-
-      const potentialSavings =
-        Math.round(
-          cat.total *
-            reductionPercent /
-            100
-        );
-
-      return {
-        category: cat.category,
-        reductionPercent,
-        potentialSavings,
-        advice: `Based on your spending pattern, reducing ${cat.category} spending by ${reductionPercent}% could save approximately ₹${potentialSavings} per month.`,
-      };
+      dailyMap[day] =
+        (dailyMap[day] || 0) +
+        Number(transaction.amount || 0);
     });
 
-  // -----------------------------
-  // INSIGHTS
-  // -----------------------------
+    return Object.entries(dailyMap)
+      .map(([day, amount]) => ({
+        day,
+        amount,
+      }))
+      .sort(
+        (a, b) =>
+          Number(a.day) - Number(b.day)
+      );
+  }, [variableExpenses]);
 
-  const insights = topCategory
-    ? [
-        {
-          type: 'warning',
-          title: `${topCategory.category} is your top spending category`,
-          detail: `${topCategory.category} accounts for ${topCategory.percentage}% of your expenses.`,
-        },
-        {
-          type: 'positive',
-          title: 'Keep tracking your expenses',
-          detail: `You have logged ${periodTransactions.length} transactions.`,
-        },
-      ]
-    : [];
+  /* ============================================================
+     AVERAGE PER DAY
 
-   // -----------------------------
-  // FINANCIAL HEALTH
-  // -----------------------------
+     Only variable spending.
+
+     Example:
+     Rent = ₹4,000 fixed
+     Mess = ₹3,200 fixed
+     Shopping = ₹1,000 variable
+
+     Average/day is based on ₹1,000 only.
+  ============================================================ */
+
+  const avgPerDay =
+    dailySpendingTrend.length > 0
+      ? Math.round(
+          totalVariableExpense /
+            dailySpendingTrend.length
+        )
+      : 0;
+
+  /* ============================================================
+     MONTHLY COMPARISON
+
+     This chart is intentionally based on actual cash flow,
+     because it shows real income vs real expenses.
+
+     Fixed expenses are real expenses here.
+  ============================================================ */
+
+  const monthlyComparison = useMemo(() => {
+    const monthlyMap: Record<
+      string,
+      {
+        income: number;
+        expense: number;
+      }
+    > = {};
+
+    transactions.forEach((transaction) => {
+      if (!transaction.date) {
+        return;
+      }
+
+      const date = new Date(transaction.date);
+
+      if (Number.isNaN(date.getTime())) {
+        return;
+      }
+
+      const monthKey = `${date.getFullYear()}-${date.getMonth()}`;
+
+      const monthLabel = date.toLocaleString(
+        'en-IN',
+        {
+          month: 'short',
+        }
+      );
+
+      if (!monthlyMap[monthKey]) {
+        monthlyMap[monthKey] = {
+          income: 0,
+          expense: 0,
+        };
+      }
+
+      if (transaction.type === 'income') {
+        monthlyMap[monthKey].income +=
+          Number(transaction.amount || 0);
+      } else {
+        monthlyMap[monthKey].expense +=
+          Number(transaction.amount || 0);
+      }
+
+      void monthLabel;
+    });
+
+    return Object.entries(monthlyMap)
+      .sort(([a], [b]) =>
+        a.localeCompare(b)
+      )
+      .map(([key, data]) => {
+        const [year, month] =
+          key.split('-').map(Number);
+
+        const date = new Date(
+          year,
+          month,
+          1
+        );
+
+        return {
+          month: date.toLocaleString(
+            'en-IN',
+            {
+              month: 'short',
+            }
+          ),
+          ...data,
+        };
+      });
+  }, [transactions]);
+
+  /* ============================================================
+     SMART REDUCTION
+  ============================================================ */
+
+  function getRecommendedReduction(
+    total: number,
+    transactionCount: number,
+    variableExpenseTotal: number
+  ) {
+    if (
+      total <= 0 ||
+      variableExpenseTotal <= 0
+    ) {
+      return 0;
+    }
+
+    const spendingShare =
+      total / variableExpenseTotal;
+
+    const shareScore =
+      spendingShare * 100;
+
+    const frequencyScore = Math.min(
+      transactionCount * 2,
+      20
+    );
+
+    const analysisScore =
+      shareScore + frequencyScore;
+
+    if (analysisScore >= 50) {
+      return 25;
+    }
+
+    if (analysisScore >= 35) {
+      return 20;
+    }
+
+    if (analysisScore >= 20) {
+      return 15;
+    }
+
+    if (analysisScore >= 10) {
+      return 10;
+    }
+
+    return 5;
+  }
+
+  /* ============================================================
+     MONEY LEAKS
+
+     ONLY VARIABLE EXPENSES.
+  ============================================================ */
+
+  const moneyLeaks = useMemo(() => {
+    return categoryBreakdown
+      .slice(0, 3)
+      .map((category) => {
+        const categoryTransactions =
+          variableExpenses.filter(
+            (transaction) =>
+              (transaction.category ||
+                'Other') ===
+              category.category
+          );
+
+        const reductionPercent =
+          getRecommendedReduction(
+            category.total,
+            categoryTransactions.length,
+            totalVariableExpense
+          );
+
+        return {
+          count:
+            categoryTransactions.length,
+          category: category.category,
+          total: category.total,
+          average: Math.round(
+            category.total /
+              Math.max(
+                1,
+                categoryTransactions.length
+              )
+          ),
+          reductionPercent,
+          potentialSavings: Math.round(
+            (category.total *
+              reductionPercent) /
+              100
+          ),
+        };
+      });
+  }, [
+    categoryBreakdown,
+    variableExpenses,
+    totalVariableExpense,
+  ]);
+
+  /* ============================================================
+     SAVING SUGGESTIONS
+
+     ONLY VARIABLE EXPENSES.
+  ============================================================ */
+
+  const savingSuggestions = useMemo(() => {
+    return categoryBreakdown
+      .slice(0, 3)
+      .map((category) => {
+        const categoryTransactions =
+          variableExpenses.filter(
+            (transaction) =>
+              (transaction.category ||
+                'Other') ===
+              category.category
+          );
+
+        const reductionPercent =
+          getRecommendedReduction(
+            category.total,
+            categoryTransactions.length,
+            totalVariableExpense
+          );
+
+        const potentialSavings =
+          Math.round(
+            (category.total *
+              reductionPercent) /
+              100
+          );
+
+        return {
+          category:
+            category.category,
+          reductionPercent,
+          potentialSavings,
+          advice:
+            `Based on your variable spending pattern, reducing ${category.category} spending by ${reductionPercent}% could save approximately ₹${potentialSavings} per month.`,
+        };
+      });
+  }, [
+    categoryBreakdown,
+    variableExpenses,
+    totalVariableExpense,
+  ]);
+
+  /* ============================================================
+     INSIGHTS
+
+     FIXED EXPENSES ARE NOT USED.
+  ============================================================ */
+
+  const insights = useMemo<InsightItem[]>(() => {
+    if (!topCategory) {
+      return [];
+    }
+
+    return [
+      {
+        type: 'warning',
+        title:
+          `${topCategory.category} is your top spending category`,
+        detail:
+          `${topCategory.category} accounts for ${topCategory.percentage}% of your variable expenses.`,
+      },
+      {
+        type: 'positive',
+        title:
+          'Keep tracking your expenses',
+        detail:
+          `You have logged ${periodTransactions.length} transactions. Fixed commitments are excluded from spending-behavior analysis.`,
+      },
+    ];
+  }, [
+    topCategory,
+    periodTransactions.length,
+  ]);
+
+  /* ============================================================
+     FINANCIAL HEALTH
+
+     IMPORTANT:
+
+     Health is based on DISCRETIONARY / VARIABLE spending.
+
+     Fixed commitments are shown separately and do not
+     reduce the insight score.
+
+     This prevents:
+       Rent ₹4,000
+       Mess ₹3,200
+
+     from making the user's personal-spending health look
+     artificially bad.
+  ============================================================ */
+
+  const discretionaryRemaining =
+    Math.max(
+      0,
+      totalIncome - totalVariableExpense
+    );
 
   const savingsRate =
     totalIncome > 0
@@ -476,7 +688,7 @@ function getRecommendedReduction(
           Math.min(
             100,
             Math.round(
-              ((totalIncome - totalExpense) /
+              (discretionaryRemaining /
                 totalIncome) *
                 100
             )
@@ -492,7 +704,7 @@ function getRecommendedReduction(
             100,
             Math.round(
               (1 -
-                totalExpense /
+                totalVariableExpense /
                   totalIncome) *
                 100
             )
@@ -501,48 +713,55 @@ function getRecommendedReduction(
       : 0;
 
   /* ============================================================
-     SPENDING BEHAVIOR ANALYSIS
-     Based on the selected period's actual transactions.
+     SPENDING BEHAVIOR
 
-     1. Consistency (40%)
-        Measures how stable daily spending is.
-     2. Trend (35%)
-        Compares earlier spending with more recent spending.
-        Lower recent spending = better behavior.
-     3. Large spending (25%)
-        Detects unusually large individual transactions.
+     ONLY VARIABLE EXPENSES.
   ============================================================ */
 
   const behaviorTransactions =
-    periodTransactions.filter(
+    variableExpenses.filter(
       (transaction) =>
-        transaction.type === 'expense' &&
         Number(transaction.amount || 0) > 0 &&
-        transaction.date
+        Boolean(transaction.date)
     );
 
   let spendingBehavior = 0;
 
   if (behaviorTransactions.length > 0) {
-    /* ------------------------------------------------------------
-       1. SPENDING CONSISTENCY
-    ------------------------------------------------------------ */
+    /* ----------------------------------------------------------
+       1. CONSISTENCY
+    ---------------------------------------------------------- */
 
-    const dailySpending: Record<string, number> = {};
+    const dailySpending: Record<
+      string,
+      number
+    > = {};
 
-    behaviorTransactions.forEach((transaction) => {
-      const date = new Date(transaction.date);
+    behaviorTransactions.forEach(
+      (transaction) => {
+        if (!transaction.date) {
+          return;
+        }
 
-      if (Number.isNaN(date.getTime())) {
-        return;
+        const date = new Date(
+          transaction.date
+        );
+
+        if (Number.isNaN(date.getTime())) {
+          return;
+        }
+
+        const dayKey = date
+          .toISOString()
+          .split('T')[0];
+
+        dailySpending[dayKey] =
+          (dailySpending[dayKey] || 0) +
+          Number(
+            transaction.amount || 0
+          );
       }
-
-      const dayKey = date.toISOString().split('T')[0];
-
-      dailySpending[dayKey] =
-        (dailySpending[dayKey] || 0) +
-        Number(transaction.amount || 0);
-    });
+    );
 
     const dailyAmounts =
       Object.values(dailySpending);
@@ -552,7 +771,8 @@ function getRecommendedReduction(
     if (dailyAmounts.length >= 2) {
       const average =
         dailyAmounts.reduce(
-          (sum, value) => sum + value,
+          (sum, value) =>
+            sum + value,
           0
         ) / dailyAmounts.length;
 
@@ -560,7 +780,10 @@ function getRecommendedReduction(
         dailyAmounts.reduce(
           (sum, value) =>
             sum +
-            Math.pow(value - average, 2),
+            Math.pow(
+              value - average,
+              2
+            ),
           0
         ) / dailyAmounts.length;
 
@@ -569,36 +792,41 @@ function getRecommendedReduction(
 
       const coefficient =
         average > 0
-          ? standardDeviation / average
+          ? standardDeviation /
+            average
           : 0;
 
-      consistencyScore = Math.max(
-        0,
-        Math.min(
-          100,
-          Math.round(
-            100 - coefficient * 50
+      consistencyScore =
+        Math.max(
+          0,
+          Math.min(
+            100,
+            Math.round(
+              100 -
+                coefficient * 50
+            )
           )
-        )
-      );
+        );
     }
 
-    /* ------------------------------------------------------------
+    /* ----------------------------------------------------------
        2. SPENDING TREND
-    ------------------------------------------------------------ */
+    ---------------------------------------------------------- */
 
     const sortedExpenses = [
       ...behaviorTransactions,
     ].sort((a, b) => {
-      const dateA =
-        a.date
-          ? new Date(a.date).getTime()
-          : 0;
+      const dateA = a.date
+        ? new Date(
+            a.date
+          ).getTime()
+        : 0;
 
-      const dateB =
-        b.date
-          ? new Date(b.date).getTime()
-          : 0;
+      const dateB = b.date
+        ? new Date(
+            b.date
+          ).getTime()
+        : 0;
 
       return dateA - dateB;
     });
@@ -661,21 +889,23 @@ function getRecommendedReduction(
             earlierAverage) *
           100;
 
-        trendScore = Math.max(
-          0,
-          Math.min(
-            100,
-            Math.round(
-              70 - change * 0.5
+        trendScore =
+          Math.max(
+            0,
+            Math.min(
+              100,
+              Math.round(
+                70 -
+                  change * 0.5
+              )
             )
-          )
-        );
+          );
       }
     }
 
-    /* ------------------------------------------------------------
-       3. LARGE-SPENDING BEHAVIOR
-    ------------------------------------------------------------ */
+    /* ----------------------------------------------------------
+       3. LARGE SPENDING
+    ---------------------------------------------------------- */
 
     const amounts =
       behaviorTransactions
@@ -684,82 +914,103 @@ function getRecommendedReduction(
             transaction.amount || 0
           )
         )
-        .sort((a, b) => a - b);
+        .filter((amount) => amount > 0)
+        .sort(
+          (a, b) => a - b
+        );
 
-    const median =
-      amounts.length % 2 === 0
-        ? (
-            amounts[
-              amounts.length / 2 - 1
-            ] +
-            amounts[
-              amounts.length / 2
-            ]
-          ) / 2
-        : amounts[
-            Math.floor(
-              amounts.length / 2
+    let largeSpendingScore = 50;
+
+    if (amounts.length > 0) {
+      const median =
+        amounts.length % 2 === 0
+          ? (
+              amounts[
+                amounts.length / 2 - 1
+              ] +
+              amounts[
+                amounts.length / 2
+              ]
+            ) / 2
+          : amounts[
+              Math.floor(
+                amounts.length / 2
+              )
+            ];
+
+      const largeTransactions =
+        median > 0
+          ? amounts.filter(
+              (amount) =>
+                amount >
+                median * 3
+            ).length
+          : 0;
+
+      const largeTransactionRatio =
+        largeTransactions /
+        Math.max(
+          1,
+          amounts.length
+        );
+
+      largeSpendingScore =
+        Math.max(
+          0,
+          Math.min(
+            100,
+            Math.round(
+              100 -
+                largeTransactionRatio *
+                  100
             )
-          ];
-
-    const largeTransactions =
-      median > 0
-        ? amounts.filter(
-            (amount) =>
-              amount > median * 3
-          ).length
-        : 0;
-
-    const largeTransactionRatio =
-      largeTransactions /
-      Math.max(
-        1,
-        amounts.length
-      );
-
-    const largeSpendingScore =
-      Math.max(
-        0,
-        Math.min(
-          100,
-          Math.round(
-            100 -
-              largeTransactionRatio *
-                100
           )
-        )
-      );
+        );
+    }
 
-    /* ------------------------------------------------------------
-       FINAL BEHAVIOR SCORE
-    ------------------------------------------------------------ */
+    /* ----------------------------------------------------------
+       FINAL SCORE
+    ---------------------------------------------------------- */
 
     spendingBehavior =
       Math.round(
         consistencyScore * 0.4 +
-        trendScore * 0.35 +
-        largeSpendingScore * 0.25
+          trendScore * 0.35 +
+          largeSpendingScore * 0.25
       );
 
-    spendingBehavior = Math.max(
-      0,
-      Math.min(
-        100,
-        spendingBehavior
-      )
-    );
+    spendingBehavior =
+      Math.max(
+        0,
+        Math.min(
+          100,
+          spendingBehavior
+        )
+      );
   }
 
-  const healthScore = Math.round(
-    (Math.max(0, savingsRate) +
-      Math.max(0, budgetControl) +
-      spendingBehavior) /
-      3
-  );
+  /* ============================================================
+     FINAL HEALTH SCORE
+  ============================================================ */
+
+  const healthScore =
+    Math.round(
+      (
+        savingsRate +
+        budgetControl +
+        spendingBehavior
+      ) / 3
+    );
+
+  /* ============================================================
+     RENDER
+  ============================================================ */
+
   return (
     <div className="space-y-6">
 
-      {/* Greeting */}
+      {/* HEADER */}
+
       <Reveal>
         <div className="flex items-center justify-between gap-4">
           <div>
@@ -774,12 +1025,13 @@ function getRecommendedReduction(
 
           <MonthSelector
             value={selectedPeriod}
-            onChange={(period) => setSelectedPeriod(period)}
+            onChange={setSelectedPeriod}
           />
         </div>
       </Reveal>
 
-      {/* Spending Overview */}
+      {/* SPENDING OVERVIEW */}
+
       <Reveal delay={50}>
         <div className="glass-card p-5">
           <span className="metric-label">
@@ -800,8 +1052,8 @@ function getRecommendedReduction(
             />
 
             <StatBox
-              label="Income"
-              value={`₹${totalIncome.toLocaleString(
+              label="Variable Spend"
+              value={`₹${totalVariableExpense.toLocaleString(
                 'en-IN'
               )}`}
             />
@@ -816,7 +1068,8 @@ function getRecommendedReduction(
             <StatBox
               label="Top Category"
               value={
-                topCategory?.category || 'N/A'
+                topCategory?.category ||
+                'N/A'
               }
               change={
                 topCategory
@@ -827,10 +1080,36 @@ function getRecommendedReduction(
             />
 
           </div>
+
+          {/* FIXED EXPENSE INFO */}
+
+          {totalFixedExpense > 0 && (
+            <div className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-3">
+
+              <div>
+                <p className="text-xs text-gray-500">
+                  Fixed commitments
+                </p>
+
+                <p className="text-sm font-semibold text-white mt-0.5">
+                  ₹
+                  {totalFixedExpense.toLocaleString(
+                    'en-IN'
+                  )}
+                </p>
+              </div>
+
+              <p className="text-xs text-gray-500 text-right">
+                Excluded from personal spending insights
+              </p>
+
+            </div>
+          )}
         </div>
       </Reveal>
 
-      {/* Monthly Comparison */}
+      {/* MONTHLY COMPARISON */}
+
       <Reveal delay={100}>
         <div className="glass-card p-5">
 
@@ -838,302 +1117,357 @@ function getRecommendedReduction(
             Monthly Comparison
           </span>
 
-          <ResponsiveContainer
-            width="100%"
-            height={220}
-          >
-            <BarChart
-              data={monthlyComparison}
-              barGap={8}
+          {monthlyComparison.length === 0 ? (
+            <div className="py-8 text-center">
+              <p className="text-sm text-gray-500">
+                No monthly transaction data available.
+              </p>
+            </div>
+          ) : (
+            <ResponsiveContainer
+              width="100%"
+              height={220}
             >
-              <CartesianGrid
-                strokeDasharray="3 3"
-                stroke="#111412"
-                vertical={false}
-              />
+              <BarChart
+                data={monthlyComparison}
+                barGap={8}
+              >
 
-              <XAxis
-                dataKey="month"
-                tick={{
-                  fontSize: 12,
-                  fill: '#4B5563',
-                }}
-              />
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  stroke="#111412"
+                  vertical={false}
+                />
 
-              <YAxis
-                tick={{
-                  fontSize: 12,
-                  fill: '#4B5563',
-                }}
-              />
+                <XAxis
+                  dataKey="month"
+                  tick={{
+                    fontSize: 12,
+                    fill: '#4B5563',
+                  }}
+                />
 
-              <Tooltip
-                contentStyle={{
-                  background: '#0C0F0D',
-                  border:
-                    '1px solid #1a1f1c',
-                  borderRadius: '8px',
-                  fontSize: '12px',
-                }}
-              />
+                <YAxis
+                  tick={{
+                    fontSize: 12,
+                    fill: '#4B5563',
+                  }}
+                />
 
-              <Bar
-                dataKey="income"
-                fill="#00FF88"
-                radius={[
-                  4,
-                  4,
-                  0,
-                  0,
-                ]}
-                opacity={0.4}
-              />
+                <Tooltip
+                  contentStyle={{
+                    background: '#0C0F0D',
+                    border:
+                      '1px solid #1a1f1c',
+                    borderRadius: '8px',
+                    fontSize: '12px',
+                  }}
+                />
 
-              <Bar
-                dataKey="expense"
-                fill="#00D97E"
-                radius={[
-                  4,
-                  4,
-                  0,
-                  0,
-                ]}
-              />
-            </BarChart>
-          </ResponsiveContainer>
+                <Bar
+                  dataKey="income"
+                  fill="#00FF88"
+                  radius={[
+                    4,
+                    4,
+                    0,
+                    0,
+                  ]}
+                  opacity={0.4}
+                />
+
+                <Bar
+                  dataKey="expense"
+                  fill="#00D97E"
+                  radius={[
+                    4,
+                    4,
+                    0,
+                    0,
+                  ]}
+                />
+
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+
+          <p className="text-[10px] text-gray-600 mt-2">
+            Monthly comparison shows actual cash flow,
+            including fixed commitments.
+          </p>
 
         </div>
       </Reveal>
 
-      {/* Category Analysis / Breakdown */}
-<Reveal delay={150}>
-  <div className="glass-card p-5">
+      {/* CATEGORY ANALYSIS */}
 
-    <div className="flex items-center justify-between mb-4">
-      <span className="metric-label">
-        {showCategoryAnalysis
-          ? 'Category Analysis'
-          : 'Breakdown by Amount'}
-      </span>
+      <Reveal delay={150}>
+        <div className="glass-card p-5">
 
-      <button
-        type="button"
-        onClick={() =>
-          setShowCategoryAnalysis(
-            !showCategoryAnalysis
-          )
-        }
-        className="text-xs font-medium text-emerald-400 hover:text-emerald-300 transition-colors"
-      >
-        {showCategoryAnalysis
-          ? 'View Breakdown'
-          : 'View Category Analysis'}
-      </button>
-    </div>
+          <div className="flex items-center justify-between mb-4">
 
-    {showCategoryAnalysis ? (
-      /* ============================
-         CATEGORY ANALYSIS
-      ============================ */
-      <ResponsiveContainer
-        width="100%"
-        height={260}
-      >
-        <PieChart>
+            <span className="metric-label">
+              {showCategoryAnalysis
+                ? 'Category Analysis'
+                : 'Breakdown by Amount'}
+            </span>
 
-          <Pie
-            data={categoryBreakdown}
-            dataKey="percentage"
-            nameKey="category"
-            cx="50%"
-            cy="50%"
-            innerRadius={60}
-            outerRadius={95}
-            paddingAngle={3}
-          >
-            {categoryBreakdown.map(
-              (_, i) => (
-                <Cell
-                  key={i}
-                  fill={
-                    PIE_COLORS[
-                      i % PIE_COLORS.length
-                    ]
-                  }
-                />
-              )
-            )}
-          </Pie>
+            <button
+              type="button"
+              onClick={() =>
+                setShowCategoryAnalysis(
+                  (value) => !value
+                )
+              }
+              className="text-xs font-medium text-emerald-400 hover:text-emerald-300 transition-colors"
+            >
+              {showCategoryAnalysis
+                ? 'View Breakdown'
+                : 'View Category Analysis'}
+            </button>
 
-          <Tooltip
-            contentStyle={{
-              background: '#0C0F0D',
-              border:
-                '1px solid #1a1f1c',
-              borderRadius: '8px',
-              fontSize: '12px',
-            }}
-          />
+          </div>
 
-        </PieChart>
-      </ResponsiveContainer>
-    ) : (
-      /* ============================
-         BREAKDOWN BY AMOUNT
-      ============================ */
-      <div className="space-y-3">
+          {categoryBreakdown.length === 0 ? (
 
-        {categoryBreakdown.map(
-          (cat, i) => (
-            <div key={cat.category}>
+            <div className="py-8 text-center">
 
-              <div className="flex items-center justify-between mb-1">
+              <p className="text-sm text-gray-500">
+                No variable spending data available
+                for this period.
+              </p>
 
-                <div className="flex items-center gap-2">
+              {totalFixedExpense > 0 && (
+                <p className="text-xs text-gray-600 mt-2">
+                  Fixed commitments are excluded
+                  from this analysis.
+                </p>
+              )}
 
-                  <span
-                    className="w-2.5 h-2.5 rounded-full"
-                    style={{
-                      background:
-                        PIE_COLORS[
-                          i %
-                            PIE_COLORS.length
-                        ],
-                    }}
-                  />
+            </div>
 
-                  <span className="text-sm text-gray-200">
-                    {cat.category}
-                  </span>
+          ) : showCategoryAnalysis ? (
 
-                  {cat.percentage >
-                    40 && (
-                    <span className="text-[10px] text-amber-400 font-medium">
-                      High concentration
-                    </span>
+            <ResponsiveContainer
+              width="100%"
+              height={260}
+            >
+              <PieChart>
+
+                <Pie
+                  data={categoryBreakdown}
+                  dataKey="percentage"
+                  nameKey="category"
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={95}
+                  paddingAngle={3}
+                >
+                  {categoryBreakdown.map(
+                    (_, index) => (
+                      <Cell
+                        key={index}
+                        fill={
+                          PIE_COLORS[
+                            index %
+                              PIE_COLORS.length
+                          ]
+                        }
+                      />
+                    )
                   )}
+                </Pie>
 
-                </div>
-
-                <span className="text-xs text-gray-400">
-                  ₹
-                  {cat.total.toLocaleString(
-                    'en-IN'
-                  )}{' '}
-                  · {cat.percentage}%
-                </span>
-
-              </div>
-
-              <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
-
-                <div
-                  className="h-full rounded-full"
-                  style={{
-                    width: `${cat.percentage}%`,
-                    background:
-                      PIE_COLORS[
-                        i %
-                          PIE_COLORS.length
-                      ],
+                <Tooltip
+                  contentStyle={{
+                    background: '#0C0F0D',
+                    border:
+                      '1px solid #1a1f1c',
+                    borderRadius: '8px',
+                    fontSize: '12px',
                   }}
                 />
 
-              </div>
+              </PieChart>
+            </ResponsiveContainer>
+
+          ) : (
+
+            <div className="space-y-3">
+
+              {categoryBreakdown.map(
+                (category, index) => (
+                  <div
+                    key={category.category}
+                  >
+
+                    <div className="flex items-center justify-between mb-1">
+
+                      <div className="flex items-center gap-2">
+
+                        <span
+                          className="w-2.5 h-2.5 rounded-full"
+                          style={{
+                            background:
+                              PIE_COLORS[
+                                index %
+                                  PIE_COLORS.length
+                              ],
+                          }}
+                        />
+
+                        <span className="text-sm text-gray-200">
+                          {category.category}
+                        </span>
+
+                        {category.percentage >
+                          40 && (
+                          <span className="text-[10px] text-amber-400 font-medium">
+                            High concentration
+                          </span>
+                        )}
+
+                      </div>
+
+                      <span className="text-xs text-gray-400">
+                        ₹
+                        {category.total.toLocaleString(
+                          'en-IN'
+                        )}{' '}
+                        · {category.percentage}%
+                      </span>
+
+                    </div>
+
+                    <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
+
+                      <div
+                        className="h-full rounded-full"
+                        style={{
+                          width: `${category.percentage}%`,
+                          background:
+                            PIE_COLORS[
+                              index %
+                                PIE_COLORS.length
+                            ],
+                        }}
+                      />
+
+                    </div>
+
+                  </div>
+                )
+              )}
 
             </div>
-          )
-        )}
+          )}
 
-      </div>
-    )}
+        </div>
+      </Reveal>
 
-  </div>
-</Reveal>
-      {/* Behavior Trend */}
+      {/* BEHAVIOR TREND */}
+
       <Reveal delay={200}>
         <div className="glass-card p-5">
 
           <span className="metric-label">
-            Behavior Trends (30 days)
+            Behavior Trends
           </span>
 
-          <ResponsiveContainer
-            width="100%"
-            height={200}
-          >
-            <AreaChart
-              data={dailySpendingTrend}
+          <p className="text-xs text-gray-600 mt-1 mb-3">
+            Variable spending only — fixed commitments excluded
+          </p>
+
+          {dailySpendingTrend.length === 0 ? (
+
+            <div className="py-8 text-center">
+              <p className="text-sm text-gray-500">
+                No variable spending data available.
+              </p>
+            </div>
+
+          ) : (
+
+            <ResponsiveContainer
+              width="100%"
+              height={200}
             >
+              <AreaChart
+                data={dailySpendingTrend}
+              >
 
-              <defs>
-                <linearGradient
-                  id="insightTrend"
-                  x1="0"
-                  y1="0"
-                  x2="0"
-                  y2="1"
-                >
-                  <stop
-                    offset="0%"
-                    stopColor="#00FF88"
-                    stopOpacity={0.3}
-                  />
+                <defs>
+                  <linearGradient
+                    id="insightTrend"
+                    x1="0"
+                    y1="0"
+                    x2="0"
+                    y2="1"
+                  >
+                    <stop
+                      offset="0%"
+                      stopColor="#00FF88"
+                      stopOpacity={0.3}
+                    />
 
-                  <stop
-                    offset="100%"
-                    stopColor="#00FF88"
-                    stopOpacity={0}
-                  />
-                </linearGradient>
-              </defs>
+                    <stop
+                      offset="100%"
+                      stopColor="#00FF88"
+                      stopOpacity={0}
+                    />
+                  </linearGradient>
+                </defs>
 
-              <CartesianGrid
-                strokeDasharray="3 3"
-                stroke="#111412"
-                vertical={false}
-              />
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  stroke="#111412"
+                  vertical={false}
+                />
 
-              <XAxis
-                dataKey="day"
-                tick={{
-                  fontSize: 10,
-                  fill: '#4B5563',
-                }}
-              />
+                <XAxis
+                  dataKey="day"
+                  tick={{
+                    fontSize: 10,
+                    fill: '#4B5563',
+                  }}
+                />
 
-              <YAxis
-                tick={{
-                  fontSize: 10,
-                  fill: '#4B5563',
-                }}
-              />
+                <YAxis
+                  tick={{
+                    fontSize: 10,
+                    fill: '#4B5563',
+                  }}
+                />
 
-              <Tooltip
-                contentStyle={{
-                  background: '#0C0F0D',
-                  border:
-                    '1px solid #1a1f1c',
-                  borderRadius: '8px',
-                  fontSize: '12px',
-                }}
-              />
+                <Tooltip
+                  contentStyle={{
+                    background: '#0C0F0D',
+                    border:
+                      '1px solid #1a1f1c',
+                    borderRadius: '8px',
+                    fontSize: '12px',
+                  }}
+                />
 
-              <Area
-                type="monotone"
-                dataKey="amount"
-                stroke="#00FF88"
-                strokeWidth={2}
-                fill="url(#insightTrend)"
-              />
+                <Area
+                  type="monotone"
+                  dataKey="amount"
+                  stroke="#00FF88"
+                  strokeWidth={2}
+                  fill="url(#insightTrend)"
+                />
 
-            </AreaChart>
-          </ResponsiveContainer>
+              </AreaChart>
+            </ResponsiveContainer>
+
+          )}
 
         </div>
       </Reveal>
 
-      {/* Financial Health */}
+      {/* FINANCIAL HEALTH */}
+
       <Reveal delay={250}>
         <div className="glass-card p-5">
 
@@ -1167,6 +1501,7 @@ function getRecommendedReduction(
                   startAngle={90}
                   endAngle={-270}
                 >
+
                   <RadialBar
                     background={{
                       fill: '#111412',
@@ -1174,6 +1509,7 @@ function getRecommendedReduction(
                     dataKey="value"
                     cornerRadius={10}
                   />
+
                 </RadialBarChart>
               </ResponsiveContainer>
 
@@ -1194,7 +1530,7 @@ function getRecommendedReduction(
             <div className="flex-1 space-y-3">
 
               <HealthRow
-                label="Savings Rate"
+                label="Variable Savings Rate"
                 value={savingsRate}
                 status={
                   savingsRate >= 50
@@ -1206,12 +1542,14 @@ function getRecommendedReduction(
               />
 
               <HealthRow
-                label="Budget Control"
+                label="Variable Budget Control"
                 value={budgetControl}
                 status={
                   budgetControl >= 60
                     ? 'GOOD'
-                    : 'MODERATE'
+                    : budgetControl >= 30
+                    ? 'MODERATE'
+                    : 'LOW'
                 }
               />
 
@@ -1231,10 +1569,19 @@ function getRecommendedReduction(
 
           </div>
 
+          {totalFixedExpense > 0 && (
+            <p className="text-[10px] text-gray-600 mt-4">
+              Financial health focuses on discretionary
+              spending. Fixed commitments are tracked
+              separately.
+            </p>
+          )}
+
         </div>
       </Reveal>
 
-      {/* Money Leaks */}
+      {/* MONEY LEAKS */}
+
       <Reveal delay={300}>
         <div className="glass-card p-5">
 
@@ -1248,61 +1595,72 @@ function getRecommendedReduction(
 
           </div>
 
-          <div className="space-y-3">
+          {moneyLeaks.length === 0 ? (
 
-            {moneyLeaks.map(
-              (leak, i) => (
-                <div
-                  key={i}
-                  className="bg-emerald-400/[0.04] border border-emerald-400/10 rounded-xl p-4"
-                >
+            <p className="text-sm text-gray-500 text-center py-6">
+              No variable spending leaks detected.
+            </p>
 
-                  <div className="flex items-start gap-3">
+          ) : (
 
-                    <Droplet className="w-4 h-4 text-emerald-400 mt-0.5" />
+            <div className="space-y-3">
 
-                    <div className="flex-1">
+              {moneyLeaks.map(
+                (leak, index) => (
+                  <div
+                    key={`${leak.category}-${index}`}
+                    className="bg-emerald-400/[0.04] border border-emerald-400/10 rounded-xl p-4"
+                  >
 
-                      <p className="text-sm text-gray-100">
-                        {leak.count} small{' '}
-                        {leak.category}{' '}
-                        purchases from{' '}
-                        {leak.merchant}
-                      </p>
+                    <div className="flex items-start gap-3">
 
-                      <p className="text-xs text-gray-500 mt-1">
-                        Total: ₹
-                        {leak.total.toLocaleString(
-                          'en-IN'
-                        )}{' '}
-                        · Average: ₹
-                        {leak.average.toLocaleString(
-                          'en-IN'
-                        )}{' '}
-                        per transaction
-                      </p>
+                      <Droplet className="w-4 h-4 text-emerald-400 mt-0.5" />
 
-                      <p className="text-xs text-emerald-400 mt-1.5">
-                        Reduce by {leak.reductionPercent}% to save ₹
-                        {leak.potentialSavings.toLocaleString(
-                          'en-IN'
-                        )}
-                      </p>
+                      <div className="flex-1">
+
+                        <p className="text-sm text-gray-100">
+                          {leak.count}{' '}
+                          {leak.category}{' '}
+                          purchases
+                        </p>
+
+                        <p className="text-xs text-gray-500 mt-1">
+                          Total: ₹
+                          {leak.total.toLocaleString(
+                            'en-IN'
+                          )}{' '}
+                          · Average: ₹
+                          {leak.average.toLocaleString(
+                            'en-IN'
+                          )}{' '}
+                          per transaction
+                        </p>
+
+                        <p className="text-xs text-emerald-400 mt-1.5">
+                          Reduce by{' '}
+                          {leak.reductionPercent}
+                          % to save ₹
+                          {leak.potentialSavings.toLocaleString(
+                            'en-IN'
+                          )}
+                        </p>
+
+                      </div>
 
                     </div>
 
                   </div>
+                )
+              )}
 
-                </div>
-              )
-            )}
-
-          </div>
+            </div>
+          )}
 
         </div>
       </Reveal>
 
-      {/* Saving Suggestions */}
+      {/* SAVING SUGGESTIONS */}
+
       <Reveal delay={350}>
         <div className="glass-card p-5">
 
@@ -1316,45 +1674,55 @@ function getRecommendedReduction(
 
           </div>
 
-          <div className="space-y-3">
+          {savingSuggestions.length === 0 ? (
 
-            {savingSuggestions.map(
-              (s) => (
-                <div
-                  key={s.category}
-                  className="border border-white/[0.06] rounded-xl p-4"
-                >
+            <p className="text-sm text-gray-500 text-center py-6">
+              No variable spending suggestions available.
+            </p>
 
-                  <div className="flex items-center justify-between mb-2">
+          ) : (
 
-                    <span className="text-sm font-medium text-white">
-                      {s.category}
-                    </span>
+            <div className="space-y-3">
 
-                    <span className="text-[10px] font-semibold text-emerald-400 bg-emerald-400/10 px-2 py-1 rounded-full">
-                      Save Up To  
-                      {s.potentialSavings.toLocaleString(
-                        'en-IN'
-                      )}
-                      /mo
-                    </span>
+              {savingSuggestions.map(
+                (suggestion) => (
+                  <div
+                    key={suggestion.category}
+                    className="border border-white/[0.06] rounded-xl p-4"
+                  >
+
+                    <div className="flex items-center justify-between mb-2">
+
+                      <span className="text-sm font-medium text-white">
+                        {suggestion.category}
+                      </span>
+
+                      <span className="text-[10px] font-semibold text-emerald-400 bg-emerald-400/10 px-2 py-1 rounded-full">
+                        Save Up To{' '}
+                        {suggestion.potentialSavings.toLocaleString(
+                          'en-IN'
+                        )}
+                        /mo
+                      </span>
+
+                    </div>
+
+                    <p className="text-xs text-gray-400">
+                      {suggestion.advice}
+                    </p>
 
                   </div>
+                )
+              )}
 
-                  <p className="text-xs text-gray-400">
-                    {s.advice}
-                  </p>
-
-                </div>
-              )
-            )}
-
-          </div>
+            </div>
+          )}
 
         </div>
       </Reveal>
 
-      {/* All Insights */}
+      {/* ALL INSIGHTS */}
+
       <Reveal delay={400}>
         <div className="glass-card p-5">
 
@@ -1364,48 +1732,53 @@ function getRecommendedReduction(
 
           <div className="space-y-3 mt-3">
 
-            {insights.map(
-              (insight, i) => (
-                <div
-                  key={i}
-                  className={`rounded-xl p-3 border ${
-                    insight.type === 'positive'
-                      ? 'bg-emerald-400/[0.04] border-emerald-400/10'
-                      : insight.type === 'warning'
-                      ? 'bg-amber-400/[0.04] border-amber-400/10'
-                      : insight.type === 'danger'
-                      ? 'bg-red-400/[0.04] border-red-400/10'
-                      : 'bg-white/[0.02] border-white/5'
-                  }`}
-                >
+            {insights.length === 0 ? (
 
-                  <div className="flex items-start gap-2">
+              <p className="text-sm text-gray-500 text-center py-6">
+                Add some variable expenses to generate insights.
+              </p>
 
-                    {insight.type ===
-                    'danger' ? (
-                      <AlertTriangle className="w-4 h-4 text-red-400 mt-0.5" />
-                    ) : insight.type ===
-                      'positive' ? (
-                      <TrendingUp className="w-4 h-4 text-emerald-400 mt-0.5" />
-                    ) : (
-                      <Lightbulb className="w-4 h-4 text-amber-400 mt-0.5" />
-                    )}
+            ) : (
 
-                    <div>
+              insights.map(
+                (insight, index) => (
+                  <div
+                    key={index}
+                    className={`rounded-xl p-3 border ${
+                      insight.type === 'positive'
+                        ? 'bg-emerald-400/[0.04] border-emerald-400/10'
+                        : insight.type === 'warning'
+                        ? 'bg-amber-400/[0.04] border-amber-400/10'
+                        : 'bg-red-400/[0.04] border-red-400/10'
+                    }`}
+                  >
 
-                      <p className="text-sm font-medium text-gray-100">
-                        {insight.title}
-                      </p>
+                    <div className="flex items-start gap-2">
 
-                      <p className="text-xs text-gray-500 mt-0.5">
-                        {insight.detail}
-                      </p>
+                      {insight.type === 'danger' ? (
+                        <AlertTriangle className="w-4 h-4 text-red-400 mt-0.5" />
+                      ) : insight.type === 'positive' ? (
+                        <TrendingUp className="w-4 h-4 text-emerald-400 mt-0.5" />
+                      ) : (
+                        <Lightbulb className="w-4 h-4 text-amber-400 mt-0.5" />
+                      )}
+
+                      <div>
+
+                        <p className="text-sm font-medium text-gray-100">
+                          {insight.title}
+                        </p>
+
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          {insight.detail}
+                        </p>
+
+                      </div>
 
                     </div>
 
                   </div>
-
-                </div>
+                )
               )
             )}
 
@@ -1418,9 +1791,9 @@ function getRecommendedReduction(
   );
 }
 
-// -----------------------------
-// STAT BOX
-// -----------------------------
+/* ============================================================
+   STAT BOX
+============================================================ */
 
 function StatBox({
   label,
@@ -1466,9 +1839,9 @@ function StatBox({
   );
 }
 
-// -----------------------------
-// HEALTH ROW
-// -----------------------------
+/* ============================================================
+   HEALTH ROW
+============================================================ */
 
 function HealthRow({
   label,
@@ -1493,7 +1866,7 @@ function HealthRow({
             status === 'GOOD'
               ? 'text-emerald-400'
               : status === 'MODERATE'
-              ? 'text-amber-400'
+              ? 'amber-400'
               : 'text-red-400'
           }`}
         >
@@ -1513,7 +1886,10 @@ function HealthRow({
               : 'bg-red-400'
           }`}
           style={{
-            width: `${value}%`,
+            width: `${Math.min(
+              100,
+              Math.max(0, value)
+            )}%`,
           }}
         />
 
@@ -1522,3 +1898,5 @@ function HealthRow({
     </div>
   );
 }
+
+export default InsightsPage;

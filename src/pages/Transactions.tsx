@@ -44,11 +44,19 @@ type Transaction = {
   id?: string;
   _id?: string;
   userId?: string;
+
   type: TransactionType;
+
   amount: number;
+
   category: string;
+
+  expenseType?: "fixed" | "variable";
+
   description: string;
+
   merchant?: string;
+
   date: string;
 };
 
@@ -541,6 +549,13 @@ function normalizeTransaction(
 
     category:
       transaction?.category || "Other",
+
+    // Preserve the fixed/variable tag returned by the backend.
+    // Old transactions without expenseType remain variable.
+    expenseType:
+      transaction?.expenseType === "fixed"
+        ? "fixed"
+        : "variable",
 
     description:
       transaction?.description || "",
@@ -1332,6 +1347,13 @@ const filtered = useMemo(() => {
                             <span className="text-xs text-emerald-400">
                               {transaction.category}
                             </span>
+
+                            {transaction.type === "expense" &&
+                              transaction.expenseType === "fixed" && (
+                                <span className="inline-flex items-center rounded-full border border-amber-400/20 bg-amber-400/10 px-2 py-0.5 text-[10px] font-semibold text-amber-400">
+                                  Fixed
+                                </span>
+                              )}
                           </div>
                         </div>
 
@@ -1474,9 +1496,18 @@ const filtered = useMemo(() => {
                 </p>
 
                 <div className="flex items-center justify-between mt-2">
-                  <span className="text-xs text-gray-500">
-                    {deleteTarget.category}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-gray-500">
+                      {deleteTarget.category}
+                    </span>
+
+                    {deleteTarget.type === "expense" &&
+                      deleteTarget.expenseType === "fixed" && (
+                        <span className="inline-flex items-center rounded-full border border-amber-400/20 bg-amber-400/10 px-2 py-0.5 text-[10px] font-semibold text-amber-400">
+                          Fixed
+                        </span>
+                      )}
+                  </div>
 
                   <span
                     className={`text-sm font-semibold ${
@@ -1656,6 +1687,10 @@ function TransactionForm({
     useState(
       editing?.category || "Other",
     );
+    const [expenseType, setExpenseType] =
+  useState<"fixed" | "variable">(
+    editing?.expenseType || "variable",
+  );
 
   const [description, setDescription] =
     useState(
@@ -1788,8 +1823,10 @@ function TransactionForm({
       type,
       amount: parsedAmount,
       category,
-      description:
-        description.trim(),
+expenseType:
+  type === "expense" ? expenseType : undefined,
+description:
+  description.trim(),
       merchant:
         merchant.trim(),
       date,
@@ -2000,6 +2037,46 @@ function TransactionForm({
               )}
             </select>
           </div>
+          {/* EXPENSE TYPE */}
+
+{type === "expense" && (
+  <div>
+    <label className="block text-xs font-medium text-gray-400 mb-2">
+      Expense Type
+    </label>
+
+    <div className="grid grid-cols-2 gap-2">
+      <button
+        type="button"
+        onClick={() => setExpenseType("variable")}
+        className={`rounded-xl border px-4 py-3 text-sm font-medium transition ${
+          expenseType === "variable"
+            ? "border-emerald-400/40 bg-emerald-400/10 text-emerald-400"
+            : "border-white/[0.08] text-gray-500"
+        }`}
+      >
+        Variable
+      </button>
+
+      <button
+        type="button"
+        onClick={() => setExpenseType("fixed")}
+        className={`rounded-xl border px-4 py-3 text-sm font-medium transition ${
+          expenseType === "fixed"
+            ? "border-amber-400/40 bg-amber-400/10 text-amber-400"
+            : "border-white/[0.08] text-gray-500"
+        }`}
+      >
+        Fixed
+      </button>
+    </div>
+
+    <p className="text-[11px] text-gray-500 mt-2">
+      Fixed expenses like rent, EMI or mess fees won't affect
+      your variable spending insights.
+    </p>
+  </div>
+)}
 
           {/* DATE */}
 

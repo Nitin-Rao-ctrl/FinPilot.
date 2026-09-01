@@ -33,7 +33,6 @@ router.get('/', async (req, res) => {
   }
 });
 
-
 /*
   CREATE transaction
 */
@@ -44,6 +43,7 @@ router.post('/', async (req, res) => {
       type,
       amount,
       category,
+      expenseType,
       description,
       merchant,
       date,
@@ -60,6 +60,7 @@ router.post('/', async (req, res) => {
       type,
       amount,
       category,
+      expenseType,
       description,
       merchant,
       date,
@@ -74,7 +75,6 @@ router.post('/', async (req, res) => {
     });
   }
 });
-
 
 /*
   UPDATE transaction
@@ -101,6 +101,7 @@ router.put('/:id', async (req, res) => {
           type: req.body.type,
           amount: req.body.amount,
           category: req.body.category,
+          expenseType: req.body.expenseType,
           description: req.body.description,
           merchant: req.body.merchant,
           date: req.body.date,
@@ -127,7 +128,6 @@ router.put('/:id', async (req, res) => {
     });
   }
 });
-
 
 /*
   DELETE transaction
@@ -166,6 +166,5 @@ router.delete('/:id', async (req, res) => {
     });
   }
 });
-
 
 module.exports = router;

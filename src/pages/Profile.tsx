@@ -3,76 +3,165 @@ import { User, Check, Save } from 'lucide-react';
 import { Reveal } from '@/lib/animations';
 import { supabase } from '@/lib/supabase';
 
+type ProfileData = {
+  name: string;
+  currency: string;
+  monthlyIncome: number;
+};
+
+const PROFILE_KEY_PREFIX = 'finpilot_profile';
+
+function getLocalDateProfileKey(userId: string) {
+  return `${PROFILE_KEY_PREFIX}_${userId}`;
+}
+
 export function ProfilePage() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [currency, setCurrency] = useState('INR');
   const [monthlyIncome, setMonthlyIncome] = useState('');
   const [saved, setSaved] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const [profileKey, setProfileKey] = useState<string | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
+
     async function loadUser() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      try {
+        const {
+          data: { user },
+          error,
+        } = await supabase.auth.getUser();
 
-      if (!user) return;
+        if (error) {
+          console.error('Failed to load user:', error);
+        }
 
-      const googleName =
-        user.user_metadata?.full_name ||
-        user.user_metadata?.name ||
-        user.user_metadata?.user_name ||
-        '';
-
-      setName(googleName);
-      setEmail(user.email || '');
-
-      // Load saved profile data if available
-      const savedProfile = localStorage.getItem(
-        'smartspend_profile'
-      );
-
-      if (savedProfile) {
-        try {
-          const parsed = JSON.parse(savedProfile);
-
-          if (parsed.currency) {
-            setCurrency(parsed.currency);
+        if (!user) {
+          if (!cancelled) {
+            setName('');
+            setEmail('');
+            setCurrency('INR');
+            setMonthlyIncome('');
+            setProfileKey(null);
+            setLoaded(true);
           }
+          return;
+        }
 
-          if (
-            typeof parsed.monthlyIncome === 'number'
-          ) {
-            setMonthlyIncome(
-              String(parsed.monthlyIncome)
+        const googleName =
+          user.user_metadata?.full_name ||
+          user.user_metadata?.name ||
+          user.user_metadata?.user_name ||
+          '';
+
+        const key = getLocalDateProfileKey(user.id);
+        const savedProfile =
+          localStorage.getItem(key);
+
+        let parsed: Partial<ProfileData> = {};
+
+        if (savedProfile) {
+          try {
+            const value = JSON.parse(savedProfile);
+
+            if (
+              value &&
+              typeof value === 'object'
+            ) {
+              parsed = value;
+            }
+          } catch (error) {
+            console.error(
+              'Failed to parse saved profile:',
+              error
             );
           }
-        } catch (error) {
-          console.error(
-            'Failed to load saved profile:',
-            error
-          );
+        }
+
+        if (cancelled) return;
+
+        setName(
+          typeof parsed.name === 'string'
+            ? parsed.name
+            : googleName
+        );
+
+        setEmail(user.email || '');
+
+        setCurrency(
+          typeof parsed.currency === 'string' &&
+            parsed.currency.length > 0
+            ? parsed.currency
+            : 'INR'
+        );
+
+        setMonthlyIncome(
+          typeof parsed.monthlyIncome === 'number' &&
+            Number.isFinite(parsed.monthlyIncome) &&
+            parsed.monthlyIncome >= 0
+            ? String(parsed.monthlyIncome)
+            : ''
+        );
+
+        setProfileKey(key);
+        setLoaded(true);
+      } catch (error) {
+        console.error(
+          'Failed to load profile:',
+          error
+        );
+
+        if (!cancelled) {
+          setName('');
+          setEmail('');
+          setCurrency('INR');
+          setMonthlyIncome('');
+          setProfileKey(null);
+          setLoaded(true);
         }
       }
     }
 
     loadUser();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   function handleSave() {
+    if (!profileKey) {
+      return;
+    }
+
+    const income = Number(monthlyIncome);
+
+    if (
+      monthlyIncome.trim() !== '' &&
+      (!Number.isFinite(income) || income < 0)
+    ) {
+      return;
+    }
+
+    const profile: ProfileData = {
+      name: name.trim(),
+      currency,
+      monthlyIncome:
+        monthlyIncome.trim() === ''
+          ? 0
+          : income,
+    };
+
     localStorage.setItem(
-      'smartspend_profile',
-      JSON.stringify({
-        name,
-        currency,
-        monthlyIncome:
-          Number(monthlyIncome) || 0,
-      })
+      profileKey,
+      JSON.stringify(profile)
     );
 
     setSaved(true);
 
-    setTimeout(() => {
+    window.setTimeout(() => {
       setSaved(false);
     }, 2000);
   }
@@ -217,7 +306,8 @@ export function ProfilePage() {
             <div className="pt-1">
               <button
                 onClick={handleSave}
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-emerald-400 text-[#050505] text-sm font-semibold hover:bg-emerald-300 transition-all glow-emerald"
+                disabled={!loaded || !profileKey}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-emerald-400 text-[#050505] text-sm font-semibold hover:bg-emerald-300 transition-all glow-emerald disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {saved ? (
                   <>
@@ -269,3 +359,5 @@ export function ProfilePage() {
     </div>
   );
 }
+
+export default ProfilePage;

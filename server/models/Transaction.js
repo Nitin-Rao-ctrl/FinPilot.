@@ -25,6 +25,14 @@ const transactionSchema = new mongoose.Schema(
       required: true,
     },
 
+    // Only relevant for expenses.
+    // Existing transactions without this field will remain valid.
+    expenseType: {
+      type: String,
+      enum: ['fixed', 'variable'],
+      default: 'variable',
+    },
+
     description: {
       type: String,
       default: '',

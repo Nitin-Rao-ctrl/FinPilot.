@@ -6,83 +6,224 @@ import {
   Moon,
 } from 'lucide-react';
 import { Reveal } from '@/lib/animations';
+import { supabase } from '@/lib/supabase';
+
+type SettingsData = {
+  notifications: boolean;
+  darkMode: boolean;
+};
+
+const SETTINGS_KEY_PREFIX = 'finpilot_settings';
+const THEME_KEY_PREFIX = 'finpilot_theme';
+
+function getSettingsKey(userId: string) {
+  return `${SETTINGS_KEY_PREFIX}_${userId}`;
+}
+
+function getThemeKey(userId: string) {
+  return `${THEME_KEY_PREFIX}_${userId}`;
+}
+
+function applyTheme(darkMode: boolean) {
+  if (darkMode) {
+    document.documentElement.classList.add('dark');
+  } else {
+    document.documentElement.classList.remove('dark');
+  }
+}
 
 export function SettingsPage() {
   const [notifications, setNotifications] = useState(true);
   const [saved, setSaved] = useState(false);
   const [darkMode, setDarkMode] = useState(true);
+  const [loaded, setLoaded] = useState(false);
+  const [settingsKey, setSettingsKey] = useState<string | null>(null);
+  const [themeKey, setThemeKey] = useState<string | null>(null);
 
-  // Load saved settings
+  /* ============================================================
+     LOAD USER SETTINGS
+  ============================================================ */
+
   useEffect(() => {
-    const savedSettings = localStorage.getItem(
-      'smartspend_settings'
-    );
+    let cancelled = false;
 
-    if (savedSettings) {
+    async function loadSettings() {
       try {
-        const parsed = JSON.parse(savedSettings);
+        const {
+          data: { user },
+          error,
+        } = await supabase.auth.getUser();
 
-        if (typeof parsed.notifications === 'boolean') {
-          setNotifications(parsed.notifications);
+        if (error) {
+          console.error(
+            'Failed to load authenticated user:',
+            error
+          );
         }
 
-        if (typeof parsed.darkMode === 'boolean') {
-          setDarkMode(parsed.darkMode);
+        if (!user) {
+          if (!cancelled) {
+            setNotifications(true);
+            setDarkMode(true);
+            setSettingsKey(null);
+            setThemeKey(null);
+            applyTheme(true);
+            setLoaded(true);
+          }
+
+          return;
         }
+
+        const userSettingsKey =
+          getSettingsKey(user.id);
+
+        const userThemeKey =
+          getThemeKey(user.id);
+
+        let nextNotifications = true;
+        let nextDarkMode = true;
+
+        const savedSettings =
+          localStorage.getItem(
+            userSettingsKey
+          );
+
+        if (savedSettings) {
+          try {
+            const parsed: Partial<SettingsData> =
+              JSON.parse(savedSettings);
+
+            if (
+              typeof parsed.notifications ===
+              'boolean'
+            ) {
+              nextNotifications =
+                parsed.notifications;
+            }
+
+            if (
+              typeof parsed.darkMode ===
+              'boolean'
+            ) {
+              nextDarkMode =
+                parsed.darkMode;
+            }
+          } catch (error) {
+            console.error(
+              'Failed to parse saved settings:',
+              error
+            );
+          }
+        }
+
+        /*
+          Theme has its own key so the instant toggle
+          remains independent of the Save button.
+        */
+        const savedTheme =
+          localStorage.getItem(
+            userThemeKey
+          );
+
+        if (
+          savedTheme === 'light'
+        ) {
+          nextDarkMode = false;
+        } else if (
+          savedTheme === 'dark'
+        ) {
+          nextDarkMode = true;
+        }
+
+        if (cancelled) return;
+
+        setNotifications(
+          nextNotifications
+        );
+
+        setDarkMode(nextDarkMode);
+        setSettingsKey(userSettingsKey);
+        setThemeKey(userThemeKey);
+
+        applyTheme(nextDarkMode);
+        setLoaded(true);
       } catch (error) {
         console.error(
           'Failed to load settings:',
           error
         );
+
+        if (!cancelled) {
+          setNotifications(true);
+          setDarkMode(true);
+          setSettingsKey(null);
+          setThemeKey(null);
+          applyTheme(true);
+          setLoaded(true);
+        }
       }
     }
 
-    // Apply saved theme
-    const savedTheme = localStorage.getItem(
-      'smartspend_theme'
-    );
+    loadSettings();
 
-    if (savedTheme === 'light') {
-      setDarkMode(false);
-      document.documentElement.classList.remove('dark');
-    } else {
-      setDarkMode(true);
-      document.documentElement.classList.add('dark');
-    }
+    return () => {
+      cancelled = true;
+    };
   }, []);
+
+  /* ============================================================
+     THEME
+  ============================================================ */
 
   function toggleTheme() {
     const newDarkMode = !darkMode;
 
     setDarkMode(newDarkMode);
+    applyTheme(newDarkMode);
 
-    if (newDarkMode) {
-      document.documentElement.classList.add('dark');
+    if (themeKey) {
       localStorage.setItem(
-        'smartspend_theme',
-        'dark'
-      );
-    } else {
-      document.documentElement.classList.remove('dark');
-      localStorage.setItem(
-        'smartspend_theme',
-        'light'
+        themeKey,
+        newDarkMode
+          ? 'dark'
+          : 'light'
       );
     }
+
+    setSaved(false);
   }
 
+  /* ============================================================
+     SAVE SETTINGS
+  ============================================================ */
+
   function handleSave() {
+    if (!settingsKey || !loaded) {
+      return;
+    }
+
+    const settings: SettingsData = {
+      notifications,
+      darkMode,
+    };
+
     localStorage.setItem(
-      'smartspend_settings',
-      JSON.stringify({
-        notifications,
-        darkMode,
-      })
+      settingsKey,
+      JSON.stringify(settings)
     );
+
+    if (themeKey) {
+      localStorage.setItem(
+        themeKey,
+        darkMode ? 'dark' : 'light'
+      );
+    }
+
+    applyTheme(darkMode);
 
     setSaved(true);
 
-    setTimeout(() => {
+    window.setTimeout(() => {
       setSaved(false);
     }, 2000);
   }
@@ -156,15 +297,17 @@ export function SettingsPage() {
 
               </div>
 
-              {/* Theme Switch */}
               <button
+                type="button"
                 onClick={toggleTheme}
+                disabled={!loaded}
                 aria-label="Toggle theme"
+                aria-pressed={darkMode}
                 className={`relative w-12 h-7 rounded-full transition-all duration-300 ${
                   darkMode
                     ? 'bg-emerald-400'
                     : 'bg-gray-300'
-                }`}
+                } disabled:opacity-50`}
               >
 
                 <span
@@ -199,14 +342,20 @@ export function SettingsPage() {
               </div>
 
               <button
+                type="button"
                 onClick={() =>
-                  setNotifications(!notifications)
+                  setNotifications(
+                    (value) => !value
+                  )
                 }
+                disabled={!loaded}
+                aria-label="Toggle notifications"
+                aria-pressed={notifications}
                 className={`relative w-11 h-6 rounded-full transition-all ${
                   notifications
                     ? 'bg-emerald-400'
                     : 'bg-white/10'
-                }`}
+                } disabled:opacity-50`}
               >
                 <span
                   className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${
@@ -221,8 +370,10 @@ export function SettingsPage() {
 
             {/* Save */}
             <button
+              type="button"
               onClick={handleSave}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-emerald-400 text-[#050505] text-sm font-semibold hover:bg-emerald-300 transition-all"
+              disabled={!loaded || !settingsKey}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-emerald-400 text-[#050505] text-sm font-semibold hover:bg-emerald-300 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {saved ? (
                 <>
@@ -241,3 +392,5 @@ export function SettingsPage() {
     </div>
   );
 }
+
+export default SettingsPage;

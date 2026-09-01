@@ -38,6 +38,7 @@ type Transaction = {
   type: 'income' | 'expense';
   amount: number | string;
   category?: string;
+  expenseType?: 'fixed' | 'variable' | string;
   description?: string;
   merchant?: string;
   date: string;
@@ -133,11 +134,19 @@ function getPeriodTransactions(
 }
 
 function getPeriodSpent(
-  transactions: Transaction[]
+  transactions: Transaction[],
+  mode: 'all' | 'variable' = 'all'
 ) {
   return transactions.reduce(
     (total, transaction) => {
       if (transaction.type !== 'expense') {
+        return total;
+      }
+
+      if (
+        mode === 'variable' &&
+        transaction.expenseType === 'fixed'
+      ) {
         return total;
       }
 
@@ -162,6 +171,7 @@ function getCategorySpent(
     (total, transaction) => {
       if (
         transaction.type !== 'expense' ||
+        transaction.expenseType === 'fixed' ||
         (transaction.category || 'Other') !== category
       ) {
         return total;
@@ -328,11 +338,29 @@ const response = await fetch(
         periodTransactions
       );
 
+    // Actual spending is kept for cash-flow/balance reality.
     const currentPeriodSpent =
       getPeriodSpent(
-        periodTransactions
+        periodTransactions,
+        'all'
       );
 
+    // Discretionary spending excludes fixed commitments such as
+    // rent, mess, EMI and other unavoidable expenses.
+    const currentVariableSpent =
+      getPeriodSpent(
+        periodTransactions,
+        'variable'
+      );
+
+    const currentFixedSpent =
+      Math.max(
+        0,
+        currentPeriodSpent -
+          currentVariableSpent
+      );
+
+    // Category analysis is discretionary only.
     const categorySpent =
       getCategorySpent(
         periodTransactions,
@@ -372,21 +400,25 @@ const response = await fetch(
         ? Math.max(
             0,
             (periodIncome -
-              currentPeriodSpent) /
+              currentFixedSpent -
+              currentVariableSpent) /
               Math.max(1, daysInPeriod)
           )
         : 0;
 
+    // Purchase is evaluated against variable/discretionary
+    // savings, while actual balance still includes fixed expenses.
     const savingsAfterPurchase =
       periodIncome -
-      currentPeriodSpent -
+      currentFixedSpent -
+      currentVariableSpent -
       purchaseAmount;
 
     const incomeUsed =
       periodIncome > 0
         ? Math.min(
             100,
-            ((currentPeriodSpent +
+            ((currentVariableSpent +
               purchaseAmount) /
               periodIncome) *
               100
@@ -416,7 +448,7 @@ const response = await fetch(
             dailyAvailable
         ).toLocaleString(
           'en-IN'
-        )} above the amount currently available per day based on this period's income and spending.`
+        )} above the amount currently available per day after accounting for fixed commitments and variable spending.`
       );
     }
 
@@ -425,7 +457,7 @@ const response = await fetch(
       savingsAfterPurchase < 0
     ) {
       warnings.push(
-        `This purchase would push this period's spending above its recorded income by ₹${Math.abs(
+        `This purchase would push your period's discretionary spending beyond the amount available after fixed commitments by ₹${Math.abs(
           savingsAfterPurchase
         ).toLocaleString(
           'en-IN'
@@ -442,7 +474,7 @@ const response = await fetch(
           savingsAfterPurchase
         ).toLocaleString(
           'en-IN'
-        )} would remain as savings after this purchase.`
+        )} would remain after fixed commitments and this purchase.`
       );
     }
 
@@ -453,7 +485,7 @@ const response = await fetch(
       warnings.push(
         `${category} would represent approximately ${Math.round(
           categoryPercentage
-        )}% of this period's recorded income after this purchase.`
+        )}% of this period's income after this purchase, based on discretionary category spending.`
       );
     }
 
@@ -466,7 +498,7 @@ const response = await fetch(
       currentBalance
     ) {
       warnings.push(
-        'You do not currently have enough available balance for this purchase.'
+        'You do not currently have enough actual available balance for this purchase.'
       );
     }
 
@@ -526,7 +558,7 @@ const response = await fetch(
       message =
         `This ₹${purchaseAmount.toLocaleString(
           'en-IN'
-        )} purchase is larger than your available balance of ₹${currentBalance.toLocaleString(
+        )} purchase is larger than your actual available balance of ₹${currentBalance.toLocaleString(
           'en-IN'
         )}. It is not recommended right now.`;
     } else if (
@@ -534,19 +566,19 @@ const response = await fetch(
       savingsAfterPurchase < 0
     ) {
       message =
-        `This purchase would consume more than the remaining savings available from the selected period's recorded income.`;
+        `This purchase would consume more than the discretionary amount available after fixed commitments in the selected period.`;
     } else if (
       warnings.length > 0
     ) {
       message =
         `You can afford this ₹${purchaseAmount.toLocaleString(
           'en-IN'
-        )} purchase, but it deserves some caution based on your selected period's spending pattern.`;
+        )} purchase, but it deserves some caution based on your variable spending pattern.`;
     } else {
       message =
         `This ₹${purchaseAmount.toLocaleString(
           'en-IN'
-        )} purchase appears manageable based on your selected period's recorded income, spending and available balance.`;
+        )} purchase appears manageable based on your selected period's income, variable spending and actual available balance.`;
     }
 
     setAnalysis({
@@ -736,6 +768,53 @@ const response = await fetch(
             )}`}
           />
 
+        </div>
+
+        <div className="mt-3 grid grid-cols-2 gap-3">
+          <SummaryCard
+            label="Fixed Commitments"
+            value={`₹${getPeriodSpent(
+              getPeriodTransactions(
+                transactions,
+                selectedPeriod
+              ),
+              'all'
+            ) - getPeriodSpent(
+              getPeriodTransactions(
+                transactions,
+                selectedPeriod
+              ),
+              'variable'
+            ) >= 0
+              ? (
+                  getPeriodSpent(
+                    getPeriodTransactions(
+                      transactions,
+                      selectedPeriod
+                    ),
+                    'all'
+                  ) -
+                  getPeriodSpent(
+                    getPeriodTransactions(
+                      transactions,
+                      selectedPeriod
+                    ),
+                    'variable'
+                  )
+                ).toLocaleString('en-IN')
+              : '0'}`}
+          />
+
+          <SummaryCard
+            label="Variable Spending"
+            value={`₹${getPeriodSpent(
+              getPeriodTransactions(
+                transactions,
+                selectedPeriod
+              ),
+              'variable'
+            ).toLocaleString('en-IN')}`}
+          />
         </div>
 
       </Reveal>
@@ -1275,7 +1354,7 @@ function AnalysisResult({
         </span>
 
         <span>
-          Selected period:{' '}
+          Actual period spending:{' '}
           <span className="text-gray-400">
             ₹
             {analysis.currentMonthSpent.toLocaleString(
@@ -1357,5 +1436,4 @@ function MetricBox({
     </div>
   );
 }
-
 export default AskPage;   

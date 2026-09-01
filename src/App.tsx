@@ -1,5 +1,4 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import type { ComponentType } from 'react';
 import { useState } from 'react';
 
 import { SplashScreen } from '@/components/SplashScreen';
@@ -20,18 +19,8 @@ import { SettingsPage } from '@/pages/settings';
 
 import { LoginPage } from '@/pages/Login';
 
-// Keep the route usable until TransactionsPage's return type is corrected.
-const TransactionsPageComponent =
-  TransactionsPage as unknown as ComponentType;
-
 export default function App() {
   const [showSplash, setShowSplash] = useState(true);
-
-  /*
-   * ============================================================
-   * SPLASH SCREEN
-   * ============================================================
-   */
 
   if (showSplash) {
     return (
@@ -41,97 +30,70 @@ export default function App() {
     );
   }
 
-  /*
-   * ============================================================
-   * MAIN APPLICATION
-   * ============================================================
-   */
-
   return (
     <BrowserRouter>
       <Routes>
 
-        {/* ======================================================
-            LANDING PAGE
-        ====================================================== */}
-
+        {/* Landing */}
         <Route
           path="/"
           element={<LandingPage />}
         />
 
-        {/* ======================================================
-            LOGIN
-        ====================================================== */}
-
+        {/* Login */}
         <Route
           path="/login"
           element={<LoginPage />}
         />
 
-        {/* ======================================================
-            MAIN APP LAYOUT
-        ====================================================== */}
-
+        {/* Main Application */}
         <Route element={<AppLayout />}>
 
-          {/* Dashboard */}
           <Route
             path="/dashboard"
             element={<DashboardPage />}
           />
 
-          
-
-          {/* Transactions */}
           <Route
             path="/transactions"
-            element={<TransactionsPageComponent />}
+            element={<TransactionsPage />}
           />
 
-          {/* Insights */}
           <Route
             path="/insights"
             element={<InsightsPage />}
           />
 
-          {/* Budget */}
           <Route
             path="/budget"
             element={<BudgetPage />}
           />
 
-          {/* Goals */}
           <Route
             path="/goals"
             element={<GoalsPage />}
           />
 
-          {/* Weekly Report */}
           <Route
             path="/weekly-report"
             element={<WeeklyReportPage />}
           />
 
-          {/* Should I Spend? */}
           <Route
             path="/ask"
             element={<AskPage />}
           />
 
-          {/* Loans */}
           <Route
             path="/loans"
             element={<LoansPage />}
           />
 
-          {/* Profile */}
           <Route
             path="/profile"
             element={<ProfilePage />}
           />
 
-          {/* Settings */}
           <Route
             path="/settings"
             element={<SettingsPage />}

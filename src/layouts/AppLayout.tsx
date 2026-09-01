@@ -5,6 +5,7 @@ import {
 } from 'react-router-dom';
 
 import { useEffect, useState } from 'react';
+import { supabase } from '@/lib/supabase';
 
 import {
   LayoutDashboard,
@@ -103,12 +104,9 @@ export function AppLayout() {
         return 'dark';
       }
 
-      const savedTheme =
-        localStorage.getItem('finpilot_theme');
-
-      return savedTheme === 'light'
-        ? 'light'
-        : 'dark';
+      // Theme is resolved after authentication in the
+      // effect below. Default is always dark.
+      return 'dark';
     }
   );
 
@@ -119,6 +117,61 @@ export function AppLayout() {
    */
 
   useEffect(() => {
+    let cancelled = false;
+
+    async function loadUserTheme() {
+      try {
+        const {
+          data: { user },
+          error,
+        } = await supabase.auth.getUser();
+
+        if (error) {
+          console.error(
+            'Failed to load authenticated user:',
+            error
+          );
+        }
+
+        if (!user || cancelled) {
+          setTheme('dark');
+          return;
+        }
+
+        const userThemeKey =
+          `finpilot_theme_${user.id}`;
+
+        const savedTheme =
+          localStorage.getItem(
+            userThemeKey
+          );
+
+        const nextTheme =
+          savedTheme === 'light'
+            ? 'light'
+            : 'dark';
+
+        setTheme(nextTheme);
+      } catch (error) {
+        console.error(
+          'Failed to load user theme:',
+          error
+        );
+
+        if (!cancelled) {
+          setTheme('dark');
+        }
+      }
+    }
+
+    loadUserTheme();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
     const root = document.documentElement;
 
     if (theme === 'light') {
@@ -126,11 +179,6 @@ export function AppLayout() {
     } else {
       root.classList.add('dark');
     }
-
-    localStorage.setItem(
-      'finpilot_theme',
-      theme
-    );
   }, [theme]);
 
   /*
@@ -140,11 +188,31 @@ export function AppLayout() {
    */
 
   const toggleTheme = () => {
-    setTheme((currentTheme) =>
-      currentTheme === 'dark'
-        ? 'light'
-        : 'dark'
-    );
+    setTheme((currentTheme) => {
+      const nextTheme =
+        currentTheme === 'dark'
+          ? 'light'
+          : 'dark';
+
+      void supabase.auth
+        .getUser()
+        .then(({ data: { user } }) => {
+          if (!user) return;
+
+          localStorage.setItem(
+            `finpilot_theme_${user.id}`,
+            nextTheme
+          );
+        })
+        .catch((error) => {
+          console.error(
+            'Failed to save theme:',
+            error
+          );
+        });
+
+      return nextTheme;
+    });
   };
 
   /*
@@ -163,8 +231,33 @@ export function AppLayout() {
    * ============================================================
    */
 
-  const handleLogout = () => {
-    window.location.href = '/';
+  const handleLogout = async () => {
+    try {
+      const { error } =
+        await supabase.auth.signOut();
+
+      if (error) {
+        console.error(
+          'Logout failed:',
+          error
+        );
+        return;
+      }
+
+      // Reset the document theme so the next user
+      // starts from the correct default until their
+      // own preference is loaded.
+      document.documentElement.classList.add(
+        'dark'
+      );
+
+      window.location.replace('/');
+    } catch (error) {
+      console.error(
+        'Logout failed:',
+        error
+      );
+    }
   };
 
   /*

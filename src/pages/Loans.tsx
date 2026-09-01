@@ -7,6 +7,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { Reveal } from '@/lib/animations';
+import { supabase } from '@/lib/supabase';
 
 /* ============================================================
    LOAN TYPE
@@ -22,7 +23,7 @@ type Loan = {
   status: 'pending' | 'partially_paid' | 'paid';
 };
 
-const STORAGE_KEY = 'smartspend_loans';
+const STORAGE_KEY_PREFIX = 'finpilot_loans';
 
 /* ============================================================
    LOANS PAGE
@@ -32,32 +33,78 @@ export function LoansPage() {
   const [loans, setLoans] = useState<Loan[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [storageKey, setStorageKey] = useState<string | null>(null);
 
   /* ============================================================
      LOAD LOANS FROM LOCAL STORAGE
   ============================================================ */
 
   useEffect(() => {
-    try {
-      const savedLoans = localStorage.getItem(STORAGE_KEY);
+    let cancelled = false;
 
-      if (savedLoans) {
-        const parsedLoans = JSON.parse(savedLoans);
+    async function loadLoans() {
+      try {
+        const {
+          data: { user },
+          error,
+        } = await supabase.auth.getUser();
 
-        if (Array.isArray(parsedLoans)) {
-          setLoans(parsedLoans);
-        } else {
+        if (error || !user) {
+          if (!cancelled) {
+            setLoans([]);
+            setStorageKey(null);
+            setLoaded(true);
+          }
+          return;
+        }
+
+        const key = `${STORAGE_KEY_PREFIX}_${user.id}`;
+
+        if (!cancelled) {
+          setStorageKey(key);
+        }
+
+        const savedLoans =
+          localStorage.getItem(key);
+
+        if (savedLoans) {
+          const parsedLoans =
+            JSON.parse(savedLoans);
+
+          if (
+            Array.isArray(parsedLoans)
+          ) {
+            if (!cancelled) {
+              setLoans(parsedLoans);
+            }
+          } else if (!cancelled) {
+            setLoans([]);
+          }
+        } else if (!cancelled) {
           setLoans([]);
         }
-      } else {
-        setLoans([]);
+      } catch (error) {
+        console.error(
+          'Failed to load loans:',
+          error
+        );
+
+        if (!cancelled) {
+          setLoans([]);
+          setStorageKey(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoaded(true);
+        }
       }
-    } catch (error) {
-      console.error('Failed to load loans:', error);
-      setLoans([]);
     }
 
-    setLoaded(true);
+    loadLoans();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   /* ============================================================
@@ -65,19 +112,34 @@ export function LoansPage() {
   ============================================================ */
 
   useEffect(() => {
-    if (!loaded) return;
+    if (!loaded || !storageKey) return;
 
     localStorage.setItem(
-      STORAGE_KEY,
+      storageKey,
       JSON.stringify(loans)
     );
-  }, [loans, loaded]);
+  }, [loans, loaded, storageKey]);
+
+  // Keep old/localStorage data from breaking totals or rendering.
+  const safeLoans = loans.filter(
+    (loan) =>
+      loan &&
+      typeof loan.id === 'string' &&
+      typeof loan.person === 'string' &&
+      Number.isFinite(Number(loan.amount)) &&
+      Number(loan.amount) > 0 &&
+      (loan.type === 'lent' ||
+        loan.type === 'borrowed') &&
+      (loan.status === 'pending' ||
+        loan.status === 'partially_paid' ||
+        loan.status === 'paid')
+  );
 
   /* ============================================================
      TOTAL LENT
   ============================================================ */
 
-  const totalLent = loans
+  const totalLent = safeLoans
     .filter(
       (loan) =>
         loan.type === 'lent' &&
@@ -92,7 +154,7 @@ export function LoansPage() {
      TOTAL BORROWED
   ============================================================ */
 
-  const totalBorrowed = loans
+  const totalBorrowed = safeLoans
     .filter(
       (loan) =>
         loan.type === 'borrowed' &&
@@ -245,7 +307,7 @@ export function LoansPage() {
       <Reveal delay={100}>
         <div className="glass-card overflow-hidden">
 
-          {loans.length === 0 ? (
+          {safeLoans.length === 0 ? (
 
             /* ==================================================
                EMPTY STATE
@@ -277,7 +339,7 @@ export function LoansPage() {
 
             <div className="divide-y divide-white/[0.03]">
 
-              {loans.map((loan) => (
+              {safeLoans.map((loan) => (
 
                 <div
                   key={loan.id}
@@ -352,7 +414,7 @@ export function LoansPage() {
                   ================================================== */}
 
                   <span className="text-sm font-semibold text-white">
-                    ₹{loan.amount.toLocaleString('en-IN')}
+                    ₹{Number(loan.amount).toLocaleString('en-IN')}
                   </span>
 
                   {/* ==================================================
@@ -421,11 +483,19 @@ function LoanForm({
   const [type, setType] =
     useState<'lent' | 'borrowed'>('lent');
 
-  const [date, setDate] = useState(
-    new Date()
-      .toISOString()
-      .split('T')[0]
-  );
+  const [date, setDate] = useState(() => {
+    const now = new Date();
+
+    const year = now.getFullYear();
+    const month = String(
+      now.getMonth() + 1
+    ).padStart(2, '0');
+    const day = String(
+      now.getDate()
+    ).padStart(2, '0');
+
+    return `${year}-${month}-${day}`;
+  });
 
   const [dueDate, setDueDate] =
     useState('');
@@ -440,14 +510,30 @@ function LoanForm({
 
     e.preventDefault();
 
-    const trimmedPerson = person.trim();
-    const amt = parseFloat(amount);
+    const trimmedPerson =
+      person.trim();
+
+    const amt = Number(amount);
 
     if (!trimmedPerson) {
       return;
     }
 
-    if (!amt || amt <= 0) {
+    if (
+      !Number.isFinite(amt) ||
+      amt <= 0
+    ) {
+      return;
+    }
+
+    if (!date) {
+      return;
+    }
+
+    if (
+      dueDate &&
+      dueDate < date
+    ) {
       return;
     }
 
