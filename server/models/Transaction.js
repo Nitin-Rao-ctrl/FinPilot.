@@ -25,8 +25,9 @@ const transactionSchema = new mongoose.Schema(
       required: true,
     },
 
-    // Only relevant for expenses.
-    // Existing transactions without this field will remain valid.
+    // Fixed vs Variable expense
+    // Fixed: Rent, EMI, Mess, Loan, etc.
+    // Variable: Food, Shopping, Movies, Travel, etc.
     expenseType: {
       type: String,
       enum: ['fixed', 'variable'],
@@ -53,4 +54,7 @@ const transactionSchema = new mongoose.Schema(
   }
 );
 
-module.exports = mongoose.model('Transaction', transactionSchema);
+module.exports = mongoose.model(
+  'Transaction',
+  transactionSchema
+);
