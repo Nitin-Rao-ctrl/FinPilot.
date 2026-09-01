@@ -341,12 +341,11 @@ select option {
   /* ----------------------------------------------------------
      METRIC LABEL
   ---------------------------------------------------------- */
+.metric-label {
+  @apply text-[10px] uppercase tracking-[0.15em] font-bold;
 
-  .metric-label {
-    @apply text-[10px] uppercase tracking-[0.15em] font-medium;
-
-    color: var(--text-muted);
-  }
+  color: var(--text-muted);
+}
 
   /* ----------------------------------------------------------
      FORM INPUT
