@@ -706,7 +706,7 @@ if (expenseTransactions.length > 0) {
       CASHFLOW FORECAST
     ============================================================ */
 
-   const forecastDays = Math.max(daysElapsed, 7);
+  const forecastDays = Math.max(daysElapsed, 1);
 
 const averageDailyExpense =
   currentMonthExpense > 0
@@ -718,11 +718,13 @@ const projectedRemainingExpense = Math.round(
 );
 
 const projectedMonthEndExpense = Math.round(
-  currentMonthExpense + projectedRemainingExpense
+  currentMonthExpense +
+    projectedRemainingExpense
 );
 
 const projectedMonthEndBalance = Math.round(
-  currentMonthBalance - projectedRemainingExpense
+  currentMonthBalance -
+    projectedRemainingExpense
 );
     
 
