@@ -247,31 +247,40 @@ function getRecommendedReduction(
     return 0;
   }
 
-  const share = total / totalExpense;
+  const spendingShare =
+    total / totalExpense;
 
-  if (
-    transactionCount >= 5 &&
-    share >= 0.20
-  ) {
+  // Higher share = higher opportunity
+  const shareScore =
+    spendingShare * 100;
+
+  // More transactions = stronger repeated-spending signal
+  const frequencyScore =
+    Math.min(transactionCount * 2, 20);
+
+  // Combine spending share + frequency
+  const analysisScore =
+    shareScore + frequencyScore;
+
+  // Convert analysis into a practical
+  // reduction recommendation
+  if (analysisScore >= 50) {
     return 25;
   }
 
-  if (
-    transactionCount >= 3 &&
-    share >= 0.15
-  ) {
+  if (analysisScore >= 35) {
     return 20;
   }
 
-  if (share >= 0.30) {
-    return 20;
-  }
-
-  if (share >= 0.15) {
+  if (analysisScore >= 20) {
     return 15;
   }
 
-  return 10;
+  if (analysisScore >= 10) {
+    return 10;
+  }
+
+  return 5;
 }
  const moneyLeaks = categoryBreakdown
   .filter(
