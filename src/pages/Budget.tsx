@@ -3,6 +3,20 @@ import { Check, AlertTriangle } from 'lucide-react';
 import { Reveal } from '@/lib/animations';
 import { supabase } from '@/lib/supabase';
 
+type Transaction = {
+  id?: string;
+  _id?: string;
+  userId?: string;
+  type?: string;
+  amount?: number | string;
+  category?: string;
+  expenseType?: 'fixed' | 'variable' | string;
+  isFixed?: boolean;
+  description?: string;
+  merchant?: string;
+  date?: string;
+};
+
 type Category = {
   category: string;
   total: number;
@@ -38,10 +52,11 @@ export function BudgetPage() {
       }
 
       // Har user ki alag key
-      const key = `smartspend_budget_${user.id}`;
+      const key = `finpilot_budget_${user.id}`;
 
       const savedBudget =
-        localStorage.getItem(key);
+        localStorage.getItem(key) ??
+        localStorage.getItem(`smartspend_budget_${user.id}`);
 
       if (!savedBudget) {
         setBudget('');
@@ -118,75 +133,110 @@ if (!res.ok) {
 
 const data = await res.json();
 
-const transactions = Array.isArray(data)
+const transactions: Transaction[] = Array.isArray(data)
   ? data
   : Array.isArray(data?.transactions)
     ? data.transactions
     : [];
 
-const expenses = transactions.filter(
-  (t: any) =>
-    String(t.type || '').toLowerCase() === 'expense' ||
-    String(t.type || '').toLowerCase() === 'debit' ||
-    String(t.type || '').toLowerCase() === 'spent'
+const isExpense = (transaction: Transaction): boolean => {
+  const type = String(transaction.type || '').toLowerCase();
+
+  return (
+    type === 'expense' ||
+    type === 'debit' ||
+    type === 'spent'
+  );
+};
+
+const isFixedExpense = (transaction: Transaction): boolean => {
+  return (
+    isExpense(transaction) &&
+    (
+      transaction.isFixed === true ||
+      String(transaction.expenseType || '').toLowerCase() === 'fixed'
+    )
+  );
+};
+
+const expenses = transactions.filter(isExpense);
+
+// Fixed expenses are real cash outflow, so they MUST count toward
+// the actual budget. They are separated only for visibility.
+const totalSpent = expenses.reduce(
+  (sum: number, transaction: Transaction): number =>
+    sum + Number(transaction.amount || 0),
+  0
 );
-      const totalSpent = expenses.reduce(
-        (sum: number, t: any) =>
-          sum + Number(t.amount || 0),
-        0
-      );
 
-      setSpent(totalSpent);
+setSpent(totalSpent);
 
-      const categoryMap: Record<string, {
-        total: number;
-        expenseType: 'fixed' | 'variable';
-      }> = {};
+const categoryMap: Record<
+  string,
+  {
+    total: number;
+    expenseType: 'fixed' | 'variable';
+  }
+> = {};
 
-      expenses.forEach((t: any) => {
-        const category =
-          t.category || 'Other';
+expenses.forEach((transaction: Transaction) => {
+  const category = transaction.category || 'Other';
 
-        const expenseType =
-          String(t.expenseType || '').toLowerCase() === 'fixed'
-            ? 'fixed'
-            : 'variable';
+  const expenseType: 'fixed' | 'variable' =
+    isFixedExpense(transaction)
+      ? 'fixed'
+      : 'variable';
 
-        const key = `${category}__${expenseType}`;
+  const key = `${category}__${expenseType}`;
 
-        if (!categoryMap[key]) {
-          categoryMap[key] = {
-            total: 0,
-            expenseType,
-          };
+  if (!categoryMap[key]) {
+    categoryMap[key] = {
+      total: 0,
+      expenseType,
+    };
+  }
+
+  categoryMap[key].total +=
+    Number(transaction.amount || 0);
+});
+
+const breakdown: Category[] = Object.entries(categoryMap)
+  .map(
+    (
+      [key, value]: [
+        string,
+        {
+          total: number;
+          expenseType: 'fixed' | 'variable';
         }
+      ]
+    ): Category => {
+      const separatorIndex = key.lastIndexOf('__');
+      const category =
+        separatorIndex >= 0
+          ? key.slice(0, separatorIndex)
+          : key;
 
-        categoryMap[key].total +=
-          Number(t.amount || 0);
-      });
+      return {
+        category,
+        total: value.total,
+        expenseType: value.expenseType,
+        percentage:
+          totalSpent > 0
+            ? Math.round(
+                (value.total / totalSpent) * 100
+              )
+            : 0,
+      };
+    }
+  );
 
-      const breakdown = Object.entries(
-        categoryMap
-      ).map(([key, value]) => {
-        const separatorIndex = key.lastIndexOf('__');
-        const category = key.slice(0, separatorIndex);
+breakdown.sort(
+  (a: Category, b: Category) =>
+    b.total - a.total
+);
 
-        return {
-          category,
-          total: value.total,
-          expenseType: value.expenseType,
-          percentage:
-            totalSpent > 0
-              ? Math.round(
-                  (value.total / totalSpent) * 100
-                )
-              : 0,
-        };
-      });
-
-      breakdown.sort((a, b) => b.total - a.total);
-
-      setCategories(breakdown);
+setCategories(breakdown);
     } catch (error) {
       console.error(
         'Failed to fetch transactions:',
@@ -217,7 +267,7 @@ const expenses = transactions.filter(
       // IMPORTANT:
       // Har user ki separate budget key
       const key =
-        `smartspend_budget_${user.id}`;
+        `finpilot_budget_${user.id}`;
 
       localStorage.setItem(
         key,
@@ -493,7 +543,7 @@ const expenses = transactions.filter(
 
                 return (
                   <div
-                    key={cat.category}
+                    key={`${cat.category}-${cat.expenseType}`}
                   >
 
                     <div className="flex items-center justify-between mb-1">
@@ -519,7 +569,7 @@ const expenses = transactions.filter(
                         {cat.total.toLocaleString(
                           'en-IN'
                         )}{' '}
-                        · {cat.percentage}%
+                        · {cat.percentage}% of total spend
                       </span>
 
                     </div>

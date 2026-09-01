@@ -24,6 +24,47 @@ type Loan = {
 };
 
 const STORAGE_KEY_PREFIX = 'finpilot_loans';
+const LEGACY_STORAGE_KEY_PREFIX = 'smartspend_loans';
+
+function isLoan(value: unknown): value is Loan {
+  if (!value || typeof value !== 'object') return false;
+
+  const loan = value as Partial<Loan>;
+
+  return (
+    typeof loan.id === 'string' &&
+    typeof loan.person === 'string' &&
+    loan.person.trim().length > 0 &&
+    Number.isFinite(Number(loan.amount)) &&
+    Number(loan.amount) > 0 &&
+    (loan.type === 'lent' || loan.type === 'borrowed') &&
+    typeof loan.date === 'string' &&
+    (loan.dueDate === null ||
+      typeof loan.dueDate === 'string' ||
+      typeof loan.dueDate === 'undefined') &&
+    (loan.status === 'pending' ||
+      loan.status === 'partially_paid' ||
+      loan.status === 'paid')
+  );
+}
+
+function parseLoans(value: string | null): Loan[] {
+  if (!value) return [];
+
+  try {
+    const parsed: unknown = JSON.parse(value);
+
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed.filter(isLoan).map((loan) => ({
+      ...loan,
+      amount: Number(loan.amount),
+      dueDate: loan.dueDate || null,
+    }));
+  } catch {
+    return [];
+  }
+}
 
 /* ============================================================
    LOANS PAGE
@@ -59,29 +100,31 @@ export function LoansPage() {
         }
 
         const key = `${STORAGE_KEY_PREFIX}_${user.id}`;
+        const legacyKey = `${LEGACY_STORAGE_KEY_PREFIX}_${user.id}`;
 
         if (!cancelled) {
           setStorageKey(key);
         }
 
-        const savedLoans =
-          localStorage.getItem(key);
+        // Prefer the current FinPilot key, but migrate old SmartSpend data
+        // for the same authenticated user when necessary.
+        const currentLoans = parseLoans(localStorage.getItem(key));
+        const legacyLoans =
+          currentLoans.length > 0
+            ? []
+            : parseLoans(localStorage.getItem(legacyKey));
 
-        if (savedLoans) {
-          const parsedLoans =
-            JSON.parse(savedLoans);
+        const loadedLoans =
+          currentLoans.length > 0
+            ? currentLoans
+            : legacyLoans;
 
-          if (
-            Array.isArray(parsedLoans)
-          ) {
-            if (!cancelled) {
-              setLoans(parsedLoans);
-            }
-          } else if (!cancelled) {
-            setLoans([]);
-          }
-        } else if (!cancelled) {
-          setLoans([]);
+        if (!cancelled) {
+          setLoans(loadedLoans);
+        }
+
+        if (currentLoans.length === 0 && legacyLoans.length > 0) {
+          localStorage.setItem(key, JSON.stringify(legacyLoans));
         }
       } catch (error) {
         console.error(
@@ -121,19 +164,11 @@ export function LoansPage() {
   }, [loans, loaded, storageKey]);
 
   // Keep old/localStorage data from breaking totals or rendering.
-  const safeLoans = loans.filter(
-    (loan) =>
-      loan &&
-      typeof loan.id === 'string' &&
-      typeof loan.person === 'string' &&
-      Number.isFinite(Number(loan.amount)) &&
-      Number(loan.amount) > 0 &&
-      (loan.type === 'lent' ||
-        loan.type === 'borrowed') &&
-      (loan.status === 'pending' ||
-        loan.status === 'partially_paid' ||
-        loan.status === 'paid')
-  );
+  const safeLoans = loans.filter(isLoan).map((loan) => ({
+    ...loan,
+    amount: Number(loan.amount),
+    dueDate: loan.dueDate || null,
+  }));
 
   /* ============================================================
      TOTAL LENT
@@ -499,6 +534,7 @@ function LoanForm({
 
   const [dueDate, setDueDate] =
     useState('');
+  const [error, setError] = useState('');
 
   /* ============================================================
      SUBMIT
@@ -510,35 +546,39 @@ function LoanForm({
 
     e.preventDefault();
 
-    const trimmedPerson =
-      person.trim();
-
+    const trimmedPerson = person.trim();
     const amt = Number(amount);
 
+    setError('');
+
     if (!trimmedPerson) {
+      setError('Person name is required.');
       return;
     }
 
-    if (
-      !Number.isFinite(amt) ||
-      amt <= 0
-    ) {
+    if (!Number.isFinite(amt) || amt <= 0) {
+      setError('Enter a valid amount greater than ₹0.');
       return;
     }
 
     if (!date) {
+      setError('Date is required.');
       return;
     }
 
-    if (
-      dueDate &&
-      dueDate < date
-    ) {
+    if (dueDate && dueDate < date) {
+      setError('Due date cannot be earlier than the loan date.');
       return;
     }
 
     const newLoan: Loan = {
-      id: String(Date.now()),
+      id:
+        typeof crypto !== 'undefined' &&
+        typeof crypto.randomUUID === 'function'
+          ? crypto.randomUUID()
+          : `${Date.now()}-${Math.random()
+              .toString(36)
+              .slice(2, 10)}`,
       person: trimmedPerson,
       amount: amt,
       type,
@@ -716,6 +756,15 @@ function LoanForm({
             />
 
           </div>
+
+          {error && (
+            <p
+              role="alert"
+              className="text-xs text-red-400 bg-red-400/5 border border-red-400/10 rounded-lg px-3 py-2"
+            >
+              {error}
+            </p>
+          )}
 
           {/* BUTTONS */}
 

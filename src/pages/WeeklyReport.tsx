@@ -13,8 +13,22 @@ import {
   type SelectedPeriod,
 } from '@/components/MonthSelector';
 
+type Transaction = {
+  id?: string;
+  _id?: string;
+  userId?: string;
+  type: 'income' | 'expense';
+  amount?: number | string;
+  category?: string;
+  expenseType?: 'fixed' | 'variable' | string;
+  isFixed?: boolean;
+  description?: string;
+  merchant?: string;
+  date?: string;
+};
+
 export function WeeklyReportPage() {
-  const [transactions, setTransactions] = useState<any[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [generated, setGenerated] = useState(true);
   const [generating, setGenerating] = useState(false);
 
@@ -171,15 +185,21 @@ export function WeeklyReportPage() {
     (t) => t.type === 'income'
   );
 
+  const isFixedExpense = (transaction: Transaction) =>
+    transaction.type === 'expense' &&
+    (
+      transaction.isFixed === true ||
+      String(transaction.expenseType || '').toLowerCase() === 'fixed'
+    );
+
+  const isVariableExpense = (transaction: Transaction) =>
+    transaction.type === 'expense' && !isFixedExpense(transaction);
+
   // Fixed commitments are real cash outflow, but they should
   // not be treated as discretionary/personal spending.
-  const fixedExpenses = expenses.filter(
-    (t) => t.expenseType === 'fixed'
-  );
+  const fixedExpenses = expenses.filter(isFixedExpense);
 
-  const variableExpenses = expenses.filter(
-    (t) => t.expenseType !== 'fixed'
-  );
+  const variableExpenses = expenses.filter(isVariableExpense);
 
   const fixedSpending = fixedExpenses.reduce(
     (sum, t) => sum + Number(t.amount || 0),
@@ -662,10 +682,10 @@ export function WeeklyReportPage() {
                   categories.map((cat) => {
 
                     const percentage =
-                      spending > 0
+                      variableSpending > 0
                         ? Math.round(
                             (cat.amount /
-                              spending) *
+                              variableSpending) *
                               100
                           )
                         : 0;
@@ -705,8 +725,9 @@ export function WeeklyReportPage() {
                   })
                 ) : (
                   <p className="text-sm text-gray-500">
-                    No expense data available for
-                    this report period.
+                    No variable spending data available for
+                    this report period. Fixed commitments are
+                    tracked separately and excluded from this analysis.
                   </p>
                 )}
 

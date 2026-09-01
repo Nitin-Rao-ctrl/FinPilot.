@@ -47,6 +47,7 @@
   type?: string;
   category?: string;
   expenseType?: 'fixed' | 'variable';
+  isFixed?: boolean;
   date?: string;
   description?: string;
 };
@@ -56,6 +57,27 @@
     title: string;
     detail: string;
   };
+
+/* ============================================================
+   FIXED EXPENSE HELPERS
+
+   A transaction is Fixed when either:
+   - expenseType === 'fixed'
+   - isFixed === true
+
+   Fixed expenses are REAL cash-flow expenses, but they are
+   NEVER part of the variable daily burn-rate calculations.
+   ============================================================ */
+
+const isFixedExpense = (transaction: Transaction) =>
+  transaction.type === 'expense' &&
+  (
+    transaction.isFixed === true ||
+    String(transaction.expenseType || '').toLowerCase() === 'fixed'
+  );
+
+const isVariableExpense = (transaction: Transaction) =>
+  transaction.type === 'expense' && !isFixedExpense(transaction);
 
   export function DashboardPage() {
     const [todayStatus, setTodayStatus] = useState<
@@ -221,8 +243,7 @@ const totalIncome = selectedTransactions
 const totalFixedExpense = selectedTransactions
   .filter(
     (t) =>
-      t.type === 'expense' &&
-      t.expenseType === 'fixed'
+      isFixedExpense(t)
   )
   .reduce(
     (sum, t) =>
@@ -233,8 +254,7 @@ const totalFixedExpense = selectedTransactions
 const totalVariableExpense = selectedTransactions
   .filter(
     (t) =>
-      t.type === 'expense' &&
-      t.expenseType !== 'fixed'
+      isVariableExpense(t)
   )
   .reduce(
     (sum, t) =>
@@ -250,6 +270,8 @@ const totalExpense = selectedTransactions
     0
   );
 
+    // Actual cash balance includes ALL real expenses.
+    // Fixed expenses therefore reduce available income here.
     const balance = totalIncome - totalExpense;
 
     const savings = balance;
@@ -322,16 +344,14 @@ const totalExpense = selectedTransactions
 const variableExpenseTransactions =
   currentMonthTransactions.filter(
     (t) =>
-      t.type === 'expense' &&
-      t.expenseType !== 'fixed' &&
+      isVariableExpense(t) &&
       Number(t.amount || 0) > 0
   );
 
 const fixedExpenseTransactions =
   currentMonthTransactions.filter(
     (t) =>
-      t.type === 'expense' &&
-      t.expenseType === 'fixed' &&
+      isFixedExpense(t) &&
       Number(t.amount || 0) > 0
   );
 
@@ -358,8 +378,7 @@ const currentMonthFixedExpense =
     selectedTransactions
       .filter(
         (t) =>
-          t.type === 'expense' &&
-          t.expenseType !== 'fixed'
+          isVariableExpense(t)
       )
       .forEach((t) => {
         const category =
@@ -393,8 +412,7 @@ const currentMonthFixedExpense =
     selectedTransactions
       .filter(
         (t) =>
-          t.type === 'expense' &&
-          t.expenseType !== 'fixed'
+          isVariableExpense(t)
       )
       .forEach((t) => {
         if (!t.date) return;
@@ -433,8 +451,7 @@ const currentMonthFixedExpense =
 
     const todayExpenses = transactions.filter(
       (t) => {
-        if (t.type !== 'expense') return false;
-        if (t.expenseType === 'fixed') return false;
+        if (!isVariableExpense(t)) return false;
         if (!t.date) return false;
 
         const date = new Date(t.date);
@@ -564,8 +581,7 @@ const currentMonthFixedExpense =
 
 const expenseTransactions = selectedTransactions.filter(
   (t) =>
-    t.type === 'expense' &&
-    t.expenseType !== 'fixed' &&
+    isVariableExpense(t) &&
     Number(t.amount || 0) > 0
 );
 
@@ -2155,3 +2171,4 @@ const runOutDays =
       </div>
     );
   }
+  

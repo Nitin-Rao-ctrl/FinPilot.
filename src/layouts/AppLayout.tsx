@@ -141,10 +141,16 @@ export function AppLayout() {
         const userThemeKey =
           `finpilot_theme_${user.id}`;
 
-        const savedTheme =
-          localStorage.getItem(
-            userThemeKey
+        let savedTheme: string | null = null;
+
+        try {
+          savedTheme = localStorage.getItem(userThemeKey);
+        } catch (storageError) {
+          console.error(
+            'Failed to read saved theme:',
+            storageError
           );
+        }
 
         const nextTheme =
           savedTheme === 'light'
@@ -194,22 +200,36 @@ export function AppLayout() {
           ? 'light'
           : 'dark';
 
-      void supabase.auth
-        .getUser()
-        .then(({ data: { user } }) => {
-          if (!user) return;
+      try {
+        void supabase.auth
+          .getUser()
+          .then(({ data: { user } }) => {
+            if (!user) return;
 
-          localStorage.setItem(
-            `finpilot_theme_${user.id}`,
-            nextTheme
-          );
-        })
-        .catch((error) => {
-          console.error(
-            'Failed to save theme:',
-            error
-          );
-        });
+            try {
+              localStorage.setItem(
+                `finpilot_theme_${user.id}`,
+                nextTheme
+              );
+            } catch (storageError) {
+              console.error(
+                'Failed to save theme:',
+                storageError
+              );
+            }
+          })
+          .catch((error) => {
+            console.error(
+              'Failed to load user while saving theme:',
+              error
+            );
+          });
+      } catch (error) {
+        console.error(
+          'Failed to persist theme:',
+          error
+        );
+      }
 
       return nextTheme;
     });
@@ -842,6 +862,7 @@ export function AppLayout() {
                   <NavLink
                     key={item.to}
                     to={item.to}
+                    onClick={() => setMobileMenuOpen(false)}
                     className={({ isActive }) => `
                       flex
                       items-center

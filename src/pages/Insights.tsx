@@ -49,6 +49,7 @@ type Transaction = {
   amount: number;
   category?: string;
   expenseType?: 'fixed' | 'variable' | string;
+  isFixed?: boolean;
   description?: string;
   merchant?: string;
   date?: string;
@@ -198,6 +199,30 @@ export function InsightsPage() {
      BASIC TRANSACTION GROUPS
   ============================================================ */
 
+  /* ============================================================
+     FIXED / VARIABLE CLASSIFICATION
+
+     Fixed transactions are real expenses and therefore remain in
+     totalExpense / cash-flow views, but they MUST NOT participate
+     in discretionary spending analytics.
+
+     Support both fields for backward compatibility:
+     - isFixed === true
+     - expenseType === 'fixed'
+
+     Everything else is treated as VARIABLE.
+  ============================================================ */
+
+  const isFixedExpense = (transaction: Transaction) =>
+    transaction.type === 'expense' &&
+    (
+      transaction.isFixed === true ||
+      String(transaction.expenseType || '').toLowerCase() === 'fixed'
+    );
+
+  const isVariableExpense = (transaction: Transaction) =>
+    transaction.type === 'expense' && !isFixedExpense(transaction);
+
   const expenses = useMemo(
     () =>
       periodTransactions.filter(
@@ -263,19 +288,13 @@ export function InsightsPage() {
 
   const fixedExpenses = useMemo(
     () =>
-      expenses.filter(
-        (transaction) =>
-          String(transaction.expenseType || '').toLowerCase() === 'fixed'
-      ),
+      expenses.filter((transaction) => isFixedExpense(transaction)),
     [expenses]
   );
 
   const variableExpenses = useMemo(
     () =>
-      expenses.filter(
-        (transaction) =>
-          String(transaction.expenseType || '').toLowerCase() !== 'fixed'
-      ),
+      expenses.filter((transaction) => isVariableExpense(transaction)),
     [expenses]
   );
 
@@ -388,13 +407,55 @@ export function InsightsPage() {
      Average/day is based on ₹1,000 only.
   ============================================================ */
 
-  const avgPerDay =
-    dailySpendingTrend.length > 0
-      ? Math.round(
-          totalVariableExpense /
-            dailySpendingTrend.length
-        )
-      : 0;
+  const avgPerDay = useMemo(() => {
+    if (totalVariableExpense <= 0) {
+      return 0;
+    }
+
+    if (selectedPeriod.type === 'month') {
+      const daysInMonth = new Date(
+        selectedPeriod.year,
+        selectedPeriod.month + 1,
+        0
+      ).getDate();
+
+      const today = new Date();
+      const isCurrentMonth =
+        today.getFullYear() === selectedPeriod.year &&
+        today.getMonth() === selectedPeriod.month;
+
+      const daysElapsed = isCurrentMonth
+        ? Math.min(today.getDate(), daysInMonth)
+        : daysInMonth;
+
+      return Math.round(
+        totalVariableExpense / Math.max(1, daysElapsed)
+      );
+    }
+
+    // For all-time mode, average only across calendar days on which
+    // variable transactions exist. Fixed expenses never enter this value.
+    const variableDates = new Set(
+      variableExpenses
+        .filter((transaction) => Boolean(transaction.date))
+        .map((transaction) => {
+          const date = new Date(transaction.date as string);
+          return Number.isNaN(date.getTime())
+            ? null
+            : date.toISOString().split('T')[0];
+        })
+        .filter((date): date is string => Boolean(date))
+    );
+
+    return Math.round(
+      totalVariableExpense /
+        Math.max(1, variableDates.size)
+    );
+  }, [
+    totalVariableExpense,
+    variableExpenses,
+    selectedPeriod,
+  ]);
 
   /* ============================================================
      MONTHLY COMPARISON
@@ -1866,7 +1927,7 @@ function HealthRow({
             status === 'GOOD'
               ? 'text-emerald-400'
               : status === 'MODERATE'
-              ? 'amber-400'
+              ? 'text-amber-400'
               : 'text-red-400'
           }`}
         >

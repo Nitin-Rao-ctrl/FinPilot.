@@ -15,6 +15,8 @@ type SettingsData = {
 
 const SETTINGS_KEY_PREFIX = 'finpilot_settings';
 const THEME_KEY_PREFIX = 'finpilot_theme';
+const LEGACY_SETTINGS_KEY_PREFIX = 'smartspend_settings';
+const LEGACY_THEME_KEY_PREFIX = 'smartspend_theme';
 
 function getSettingsKey(userId: string) {
   return `${SETTINGS_KEY_PREFIX}_${userId}`;
@@ -22,6 +24,14 @@ function getSettingsKey(userId: string) {
 
 function getThemeKey(userId: string) {
   return `${THEME_KEY_PREFIX}_${userId}`;
+}
+
+function getLegacySettingsKey(userId: string) {
+  return `${LEGACY_SETTINGS_KEY_PREFIX}_${userId}`;
+}
+
+function getLegacyThemeKey(userId: string) {
+  return `${LEGACY_THEME_KEY_PREFIX}_${userId}`;
 }
 
 function applyTheme(darkMode: boolean) {
@@ -83,30 +93,37 @@ export function SettingsPage() {
         let nextNotifications = true;
         let nextDarkMode = true;
 
-        const savedSettings =
-          localStorage.getItem(
-            userSettingsKey
+        let savedSettings: string | null = null;
+
+        try {
+          savedSettings =
+            localStorage.getItem(userSettingsKey) ??
+            localStorage.getItem(getLegacySettingsKey(user.id));
+        } catch (storageError) {
+          console.error(
+            'Failed to read saved settings:',
+            storageError
           );
+        }
 
         if (savedSettings) {
           try {
-            const parsed: Partial<SettingsData> =
-              JSON.parse(savedSettings);
+            const value: unknown = JSON.parse(savedSettings);
 
             if (
-              typeof parsed.notifications ===
-              'boolean'
+              value &&
+              typeof value === 'object' &&
+              !Array.isArray(value)
             ) {
-              nextNotifications =
-                parsed.notifications;
-            }
+              const parsed = value as Partial<SettingsData>;
 
-            if (
-              typeof parsed.darkMode ===
-              'boolean'
-            ) {
-              nextDarkMode =
-                parsed.darkMode;
+              if (typeof parsed.notifications === 'boolean') {
+                nextNotifications = parsed.notifications;
+              }
+
+              if (typeof parsed.darkMode === 'boolean') {
+                nextDarkMode = parsed.darkMode;
+              }
             }
           } catch (error) {
             console.error(
@@ -120,10 +137,18 @@ export function SettingsPage() {
           Theme has its own key so the instant toggle
           remains independent of the Save button.
         */
-        const savedTheme =
-          localStorage.getItem(
-            userThemeKey
+        let savedTheme: string | null = null;
+
+        try {
+          savedTheme =
+            localStorage.getItem(userThemeKey) ??
+            localStorage.getItem(getLegacyThemeKey(user.id));
+        } catch (storageError) {
+          console.error(
+            'Failed to read saved theme:',
+            storageError
           );
+        }
 
         if (
           savedTheme === 'light'
@@ -182,12 +207,19 @@ export function SettingsPage() {
     applyTheme(newDarkMode);
 
     if (themeKey) {
-      localStorage.setItem(
-        themeKey,
-        newDarkMode
-          ? 'dark'
-          : 'light'
-      );
+      try {
+        localStorage.setItem(
+          themeKey,
+          newDarkMode
+            ? 'dark'
+            : 'light'
+        );
+      } catch (storageError) {
+        console.error(
+          'Failed to save theme:',
+          storageError
+        );
+      }
     }
 
     setSaved(false);
@@ -203,24 +235,31 @@ export function SettingsPage() {
     }
 
     const settings: SettingsData = {
-      notifications,
-      darkMode,
+      notifications: Boolean(notifications),
+      darkMode: Boolean(darkMode),
     };
 
-    localStorage.setItem(
-      settingsKey,
-      JSON.stringify(settings)
-    );
-
-    if (themeKey) {
+    try {
       localStorage.setItem(
-        themeKey,
-        darkMode ? 'dark' : 'light'
+        settingsKey,
+        JSON.stringify(settings)
       );
+
+      if (themeKey) {
+        localStorage.setItem(
+          themeKey,
+          darkMode ? 'dark' : 'light'
+        );
+      }
+    } catch (storageError) {
+      console.error(
+        'Failed to save settings:',
+        storageError
+      );
+      return;
     }
 
     applyTheme(darkMode);
-
     setSaved(true);
 
     window.setTimeout(() => {
@@ -343,11 +382,12 @@ export function SettingsPage() {
 
               <button
                 type="button"
-                onClick={() =>
+                onClick={() => {
                   setNotifications(
                     (value) => !value
-                  )
-                }
+                  );
+                  setSaved(false);
+                }}
                 disabled={!loaded}
                 aria-label="Toggle notifications"
                 aria-pressed={notifications}

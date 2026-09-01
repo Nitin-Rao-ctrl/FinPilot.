@@ -35,13 +35,14 @@ type Category =
 type Transaction = {
   _id?: string;
   id?: string;
-  type: 'income' | 'expense';
-  amount: number | string;
+  type?: string;
+  amount?: number | string;
   category?: string;
   expenseType?: 'fixed' | 'variable' | string;
+  isFixed?: boolean;
   description?: string;
   merchant?: string;
-  date: string;
+  date?: string;
 };
 
 type Analysis = {
@@ -79,9 +80,50 @@ const CATEGORIES: Category[] = [
 ];
 
 
+function isIncomeTransaction(
+  transaction: Transaction
+): boolean {
+  return (
+    String(transaction.type || '').toLowerCase() === 'income'
+  );
+}
+
+function isExpenseTransaction(
+  transaction: Transaction
+): boolean {
+  const type = String(transaction.type || '').toLowerCase();
+
+  return (
+    type === 'expense' ||
+    type === 'debit' ||
+    type === 'spent'
+  );
+}
+
+function isFixedExpense(
+  transaction: Transaction
+): boolean {
+  return (
+    isExpenseTransaction(transaction) &&
+    (
+      transaction.isFixed === true ||
+      String(transaction.expenseType || '').toLowerCase() === 'fixed'
+    )
+  );
+}
+
+function isVariableExpense(
+  transaction: Transaction
+): boolean {
+  return (
+    isExpenseTransaction(transaction) &&
+    !isFixedExpense(transaction)
+  );
+}
+
 function getCurrentBalance(
   transactions: Transaction[]
-) {
+): number {
   return transactions.reduce(
     (balance, transaction) => {
       const amount = Number(
@@ -92,14 +134,15 @@ function getCurrentBalance(
         return balance;
       }
 
-      if (
-        transaction.type ===
-        'income'
-      ) {
+      if (isIncomeTransaction(transaction)) {
         return balance + amount;
       }
 
-      return balance - amount;
+      if (isExpenseTransaction(transaction)) {
+        return balance - amount;
+      }
+
+      return balance;
     },
     0
   );
@@ -108,21 +151,19 @@ function getCurrentBalance(
 function getPeriodTransactions(
   transactions: Transaction[],
   period: SelectedPeriod
-) {
+): Transaction[] {
   if (period.type === 'all') {
     return transactions;
   }
 
   return transactions.filter((transaction) => {
-    if (!transaction.date) return false;
+    if (!transaction.date) {
+      return false;
+    }
 
     const date = new Date(transaction.date);
 
     if (Number.isNaN(date.getTime())) {
-      return false;
-    }
-
-    if (period.type !== 'month') {
       return false;
     }
 
@@ -136,16 +177,16 @@ function getPeriodTransactions(
 function getPeriodSpent(
   transactions: Transaction[],
   mode: 'all' | 'variable' = 'all'
-) {
+): number {
   return transactions.reduce(
     (total, transaction) => {
-      if (transaction.type !== 'expense') {
+      if (!isExpenseTransaction(transaction)) {
         return total;
       }
 
       if (
         mode === 'variable' &&
-        transaction.expenseType === 'fixed'
+        !isVariableExpense(transaction)
       ) {
         return total;
       }
@@ -166,12 +207,11 @@ function getPeriodSpent(
 function getCategorySpent(
   transactions: Transaction[],
   category: Category
-) {
+): number {
   return transactions.reduce(
     (total, transaction) => {
       if (
-        transaction.type !== 'expense' ||
-        transaction.expenseType === 'fixed' ||
+        !isVariableExpense(transaction) ||
         (transaction.category || 'Other') !== category
       ) {
         return total;
@@ -283,11 +323,10 @@ const response = await fetch(
       const data =
         await response.json();
 
-      setTransactions(
-        Array.isArray(data)
-          ? data
-          : []
-      );
+      const normalizedTransactions: Transaction[] =
+        Array.isArray(data) ? data : [];
+
+      setTransactions(normalizedTransactions);
     } catch (error) {
       console.error(
         'Failed to load financial data:',
@@ -354,10 +393,13 @@ const response = await fetch(
       );
 
     const currentFixedSpent =
-      Math.max(
-        0,
-        currentPeriodSpent -
-          currentVariableSpent
+      getPeriodSpent(
+        periodTransactions,
+        'all'
+      ) -
+      getPeriodSpent(
+        periodTransactions,
+        'variable'
       );
 
     // Category analysis is discretionary only.
@@ -747,7 +789,7 @@ const response = await fetch(
               )
                 .filter(
                   (transaction) =>
-                    transaction.type === 'income'
+                    isIncomeTransaction(transaction)
                 )
                 .reduce(
                   (sum, transaction) =>
@@ -1044,6 +1086,11 @@ const response = await fetch(
 
             <p className="metric-label mb-5">
               Financial Impact Breakdown
+            </p>
+
+            <p className="text-[10px] text-gray-600 mb-4">
+              Fixed commitments affect your real balance and cash flow,
+              but discretionary category analysis uses variable spending only.
             </p>
 
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

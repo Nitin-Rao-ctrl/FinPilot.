@@ -197,35 +197,40 @@ function calculateStatus(
    If a goal does not exist, it is NOT created automatically.
    ============================================================ */
 
-function normalizeGoal(goal: any): Goal {
+function normalizeGoal(goal: unknown): Goal {
+  const source =
+    goal && typeof goal === 'object'
+      ? (goal as Record<string, unknown>)
+      : {};
+
   const targetAmount = Math.max(
     0,
-    Number(goal?.targetAmount) || 0
+    Number(source.targetAmount) || 0
   );
 
   const savedAmount = Math.max(
     0,
-    Number(goal?.savedAmount) || 0
+    Number(source.savedAmount) || 0
   );
 
   const deadline =
-    typeof goal?.deadline === 'string' &&
-    goal.deadline.length > 0
-      ? goal.deadline
+    typeof source.deadline === 'string' &&
+    source.deadline.length > 0
+      ? source.deadline
       : '';
 
   return {
     id:
-      typeof goal?.id === 'string' &&
-      goal.id.length > 0
-        ? goal.id
+      typeof source.id === 'string' &&
+      source.id.length > 0
+        ? source.id
         : `${Date.now()}-${Math.random()
             .toString(36)
             .slice(2)}`,
 
     name:
-      typeof goal?.name === 'string'
-        ? goal.name
+      typeof source.name === 'string'
+        ? source.name
         : '',
 
     targetAmount,
@@ -422,10 +427,13 @@ export function GoalsPage() {
       */
 
       const storageKey =
-        `smartspend_goals_${currentUserId}`;
+        `finpilot_goals_${currentUserId}`;
 
       const stored =
-        localStorage.getItem(storageKey);
+        localStorage.getItem(storageKey) ??
+        localStorage.getItem(
+          `smartspend_goals_${currentUserId}`
+        );
 
       /*
         Brand-new account:
@@ -454,11 +462,11 @@ export function GoalsPage() {
 
       const validGoals = parsed
         .filter(
-          (goal) =>
+          (goal: unknown) =>
             goal &&
             typeof goal === 'object'
         )
-        .map(normalizeGoal)
+        .map((goal: unknown) => normalizeGoal(goal))
         .filter(
           (goal) =>
             goal.name.trim() !== '' &&
@@ -493,7 +501,7 @@ export function GoalsPage() {
 
     try {
       const storageKey =
-        `smartspend_goals_${userId}`;
+        `finpilot_goals_${userId}`;
 
       localStorage.setItem(
         storageKey,
@@ -555,6 +563,23 @@ export function GoalsPage() {
     if (!targetDate) {
       alert(
         'Please select a target date.'
+      );
+      return;
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const deadlineDate = new Date(
+      `${targetDate}T00:00:00`
+    );
+
+    if (
+      Number.isNaN(deadlineDate.getTime()) ||
+      deadlineDate < today
+    ) {
+      alert(
+        'Please select today or a future target date.'
       );
       return;
     }
