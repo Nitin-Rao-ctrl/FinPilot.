@@ -405,8 +405,210 @@ useEffect(() => {
           )
         : 0;
 
-    const behaviorScore =
-      transactions.length > 0 ? 80 : 0;
+    /* ============================================================
+   SPENDING BEHAVIOR ANALYSIS
+   Based on actual transaction history
+============================================================ */
+
+const expenseTransactions = transactions.filter(
+  (t) =>
+    t.type === 'expense' &&
+    Number(t.amount || 0) > 0
+);
+
+let behaviorScore = 0;
+
+if (expenseTransactions.length > 0) {
+  /*
+   * 1. SPENDING CONSISTENCY
+   * Checks how stable the user's daily spending pattern is.
+   */
+  const dailySpending: Record<string, number> = {};
+
+  expenseTransactions.forEach((t) => {
+    if (!t.date) return;
+
+    const date = new Date(t.date);
+
+    if (Number.isNaN(date.getTime())) return;
+
+    const dayKey = date.toISOString().split('T')[0];
+
+    dailySpending[dayKey] =
+      (dailySpending[dayKey] || 0) +
+      Number(t.amount || 0);
+  });
+
+  const dailyAmounts = Object.values(dailySpending);
+
+  let consistencyScore = 50;
+
+  if (dailyAmounts.length >= 2) {
+    const average =
+      dailyAmounts.reduce(
+        (sum, value) => sum + value,
+        0
+      ) / dailyAmounts.length;
+
+    const variance =
+      dailyAmounts.reduce(
+        (sum, value) =>
+          sum +
+          Math.pow(value - average, 2),
+        0
+      ) / dailyAmounts.length;
+
+    const standardDeviation =
+      Math.sqrt(variance);
+
+    const coefficient =
+      average > 0
+        ? standardDeviation / average
+        : 0;
+
+    consistencyScore = Math.max(
+      0,
+      Math.min(
+        100,
+        Math.round(100 - coefficient * 50)
+      )
+    );
+  }
+
+  /*
+   * 2. SPENDING TREND
+   * Compares recent spending with earlier spending.
+   * Lower recent spending = better behavior.
+   */
+  const sortedExpenses = [
+    ...expenseTransactions,
+  ].sort((a, b) => {
+    const dateA = a.date
+      ? new Date(a.date).getTime()
+      : 0;
+
+    const dateB = b.date
+      ? new Date(b.date).getTime()
+      : 0;
+
+    return dateA - dateB;
+  });
+
+  let trendScore = 50;
+
+  if (sortedExpenses.length >= 4) {
+    const midpoint =
+      Math.floor(sortedExpenses.length / 2);
+
+    const earlierExpenses =
+      sortedExpenses.slice(0, midpoint);
+
+    const recentExpenses =
+      sortedExpenses.slice(midpoint);
+
+    const earlierTotal =
+      earlierExpenses.reduce(
+        (sum, t) =>
+          sum + Number(t.amount || 0),
+        0
+      );
+
+    const recentTotal =
+      recentExpenses.reduce(
+        (sum, t) =>
+          sum + Number(t.amount || 0),
+        0
+      );
+
+    const earlierAverage =
+      earlierTotal /
+      Math.max(1, earlierExpenses.length);
+
+    const recentAverage =
+      recentTotal /
+      Math.max(1, recentExpenses.length);
+
+    if (earlierAverage > 0) {
+      const change =
+        ((recentAverage -
+          earlierAverage) /
+          earlierAverage) *
+        100;
+
+      trendScore = Math.max(
+        0,
+        Math.min(
+          100,
+          Math.round(70 - change * 0.5)
+        )
+      );
+    }
+  }
+
+  /*
+   * 3. LARGE-SPENDING BEHAVIOR
+   * Checks how much of the spending comes from
+   * unusually large individual transactions.
+   */
+  const amounts = expenseTransactions
+    .map((t) => Number(t.amount || 0))
+    .sort((a, b) => a - b);
+
+  const median =
+    amounts.length % 2 === 0
+      ? (
+          amounts[
+            amounts.length / 2 - 1
+          ] +
+          amounts[
+            amounts.length / 2
+          ]
+        ) / 2
+      : amounts[
+          Math.floor(amounts.length / 2)
+        ];
+
+  const largeTransactions =
+    median > 0
+      ? amounts.filter(
+          (amount) =>
+            amount > median * 3
+        ).length
+      : 0;
+
+  const largeTransactionRatio =
+    largeTransactions /
+    Math.max(1, amounts.length);
+
+  const largeSpendingScore = Math.max(
+    0,
+    Math.min(
+      100,
+      Math.round(
+        100 -
+          largeTransactionRatio * 100
+      )
+    )
+  );
+
+  /*
+   * FINAL BEHAVIOR SCORE
+   *
+   * Consistency  = 40%
+   * Trend        = 35%
+   * Large spend  = 25%
+   */
+  behaviorScore = Math.round(
+    consistencyScore * 0.4 +
+      trendScore * 0.35 +
+      largeSpendingScore * 0.25
+  );
+
+  behaviorScore = Math.max(
+    0,
+    Math.min(100, behaviorScore)
+  );
+}
 
     const healthScore = Math.round(
       (Math.max(0, savingsScore) +
