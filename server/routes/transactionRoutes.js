@@ -35,6 +35,14 @@ router.get('/', async (req, res) => {
 
 /*
   CREATE transaction
+
+  Fixed expenses are stored using both:
+  - expenseType: 'fixed'
+  - isFixed: true
+
+  Variable expenses are stored using both:
+  - expenseType: 'variable'
+  - isFixed: false
 */
 router.post('/', async (req, res) => {
   try {
@@ -44,6 +52,7 @@ router.post('/', async (req, res) => {
       amount,
       category,
       expenseType,
+      isFixed,
       description,
       merchant,
       date,
@@ -55,12 +64,22 @@ router.post('/', async (req, res) => {
       });
     }
 
+    const fixed =
+      type === 'expense' &&
+      (
+        isFixed === true ||
+        String(expenseType || '').toLowerCase() === 'fixed'
+      );
+
     const transaction = await Transaction.create({
       userId,
       type,
       amount,
       category,
-      expenseType,
+      expenseType: type === 'expense'
+        ? (fixed ? 'fixed' : 'variable')
+        : undefined,
+      isFixed: type === 'expense' ? fixed : false,
       description,
       merchant,
       date,
@@ -91,6 +110,13 @@ router.put('/:id', async (req, res) => {
       });
     }
 
+    const fixed =
+      req.body.type === 'expense' &&
+      (
+        req.body.isFixed === true ||
+        String(req.body.expenseType || '').toLowerCase() === 'fixed'
+      );
+
     const transaction = await Transaction.findOneAndUpdate(
       {
         _id: req.params.id,
@@ -101,7 +127,10 @@ router.put('/:id', async (req, res) => {
           type: req.body.type,
           amount: req.body.amount,
           category: req.body.category,
-          expenseType: req.body.expenseType,
+          expenseType: req.body.type === 'expense'
+            ? (fixed ? 'fixed' : 'variable')
+            : undefined,
+          isFixed: req.body.type === 'expense' ? fixed : false,
           description: req.body.description,
           merchant: req.body.merchant,
           date: req.body.date,
@@ -168,3 +197,4 @@ router.delete('/:id', async (req, res) => {
 });
 
 module.exports = router;
+

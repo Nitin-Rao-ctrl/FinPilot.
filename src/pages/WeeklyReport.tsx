@@ -12,6 +12,12 @@ import {
   MonthSelector,
   type SelectedPeriod,
 } from '@/components/MonthSelector';
+import {
+  isFixedTransaction,
+  isVariableTransaction,
+  isIncome,
+  isExpense,
+} from '@/lib/financial';
 
 type Transaction = {
   id?: string;
@@ -178,28 +184,19 @@ export function WeeklyReportPage() {
   });
 
   const expenses = weekTransactions.filter(
-    (t) => t.type === 'expense'
+    (t) => isExpense(t)
   );
 
   const incomes = weekTransactions.filter(
-    (t) => t.type === 'income'
+    (t) => isIncome(t)
   );
 
-  const isFixedExpense = (transaction: Transaction) =>
-    transaction.type === 'expense' &&
-    (
-      transaction.isFixed === true ||
-      String(transaction.expenseType || '').toLowerCase() === 'fixed'
-    );
-
-  const isVariableExpense = (transaction: Transaction) =>
-    transaction.type === 'expense' && !isFixedExpense(transaction);
 
   // Fixed commitments are real cash outflow, but they should
   // not be treated as discretionary/personal spending.
-  const fixedExpenses = expenses.filter(isFixedExpense);
+  const fixedExpenses = expenses.filter(isFixedTransaction);
 
-  const variableExpenses = expenses.filter(isVariableExpense);
+  const variableExpenses = expenses.filter(isVariableTransaction);
 
   const fixedSpending = fixedExpenses.reduce(
     (sum, t) => sum + Number(t.amount || 0),

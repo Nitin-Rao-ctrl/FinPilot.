@@ -31,6 +31,20 @@
   import { CountUp, Reveal } from '@/lib/animations';
   import { supabase } from '@/lib/supabase';
   import type { SelectedPeriod } from '@/components/MonthSelector';
+  import {
+  isExpense,
+  isIncome,
+  isFixedTransaction,
+  isVariableTransaction,
+  calculateActualBalance,
+  calculateTotalExpenses,
+  calculateFixedExpenses,
+  calculateVariableExpenses,
+  calculateAverageDailyVariableSpend,
+  calculateProjectedVariableSpend,
+  calculateProjectedMonthEndBalance,
+  calculateRunOutDays,
+} from '@/lib/financial';
 
   const PIE_COLORS = [
     '#00FF88',
@@ -69,15 +83,7 @@
    NEVER part of the variable daily burn-rate calculations.
    ============================================================ */
 
-const isFixedExpense = (transaction: Transaction) =>
-  transaction.type === 'expense' &&
-  (
-    transaction.isFixed === true ||
-    String(transaction.expenseType || '').toLowerCase() === 'fixed'
-  );
 
-const isVariableExpense = (transaction: Transaction) =>
-  transaction.type === 'expense' && !isFixedExpense(transaction);
 
   export function DashboardPage() {
     const [todayStatus, setTodayStatus] = useState<
@@ -233,7 +239,7 @@ const selectedTransactions =
 ============================================================ */
 
 const totalIncome = selectedTransactions
-  .filter((t) => t.type === 'income')
+  .filter(isIncome)
   .reduce(
     (sum, t) =>
       sum + Number(t.amount || 0),
@@ -243,7 +249,7 @@ const totalIncome = selectedTransactions
 const totalFixedExpense = selectedTransactions
   .filter(
     (t) =>
-      isFixedExpense(t)
+      isFixedTransaction(t)
   )
   .reduce(
     (sum, t) =>
@@ -254,7 +260,7 @@ const totalFixedExpense = selectedTransactions
 const totalVariableExpense = selectedTransactions
   .filter(
     (t) =>
-      isVariableExpense(t)
+      isVariableTransaction(t)
   )
   .reduce(
     (sum, t) =>
@@ -262,12 +268,9 @@ const totalVariableExpense = selectedTransactions
     0
   );
 
-const totalExpense = selectedTransactions
-  .filter((t) => t.type === 'expense')
-  .reduce(
-    (sum, t) =>
-      sum + Number(t.amount || 0),
-    0
+const totalExpense =
+  calculateTotalExpenses(
+    selectedTransactions
   );
 
     // Actual cash balance includes ALL real expenses.
@@ -324,13 +327,9 @@ const totalExpense = selectedTransactions
         );
 
     const currentMonthExpense =
-      currentMonthTransactions
-        .filter((t) => t.type === 'expense')
-        .reduce(
-          (sum, t) =>
-            sum + Number(t.amount || 0),
-          0
-        );
+      calculateTotalExpenses(
+        currentMonthTransactions
+      );
 
     const currentMonthBalance =
       currentMonthIncome - currentMonthExpense;
@@ -344,14 +343,14 @@ const totalExpense = selectedTransactions
 const variableExpenseTransactions =
   currentMonthTransactions.filter(
     (t) =>
-      isVariableExpense(t) &&
+      isVariableTransaction(t) &&
       Number(t.amount || 0) > 0
   );
 
 const fixedExpenseTransactions =
   currentMonthTransactions.filter(
     (t) =>
-      isFixedExpense(t) &&
+      isFixedTransaction(t) &&
       Number(t.amount || 0) > 0
   );
 
@@ -378,7 +377,7 @@ const currentMonthFixedExpense =
     selectedTransactions
       .filter(
         (t) =>
-          isVariableExpense(t)
+          isVariableTransaction(t)
       )
       .forEach((t) => {
         const category =
@@ -412,7 +411,7 @@ const currentMonthFixedExpense =
     selectedTransactions
       .filter(
         (t) =>
-          isVariableExpense(t)
+          isVariableTransaction(t)
       )
       .forEach((t) => {
         if (!t.date) return;
@@ -451,7 +450,7 @@ const currentMonthFixedExpense =
 
     const todayExpenses = transactions.filter(
       (t) => {
-        if (!isVariableExpense(t)) return false;
+        if (!isVariableTransaction(t)) return false;
         if (!t.date) return false;
 
         const date = new Date(t.date);
@@ -581,7 +580,7 @@ const currentMonthFixedExpense =
 
 const expenseTransactions = selectedTransactions.filter(
   (t) =>
-    isVariableExpense(t) &&
+    isVariableTransaction(t) &&
     Number(t.amount || 0) > 0
 );
 
@@ -952,10 +951,10 @@ const forecastMessage =
   NOT ₹8,200.
 */
 const averageDailyVariableSpend =
-  daysElapsed > 0
-    ? currentMonthVariableExpense /
-      daysElapsed
-    : 0;
+      calculateAverageDailyVariableSpend(
+        currentMonthTransactions,
+        daysElapsed
+      );
 
 /*
   Run-out is based on discretionary/variable
@@ -963,14 +962,10 @@ const averageDailyVariableSpend =
   fixed commitments.
 */
 const runOutDays =
-  averageDailyVariableSpend > 0 &&
-  currentMonthBalance > 0
-    ? Math.round(
-        (currentMonthBalance /
-          averageDailyVariableSpend) *
-          10
-      ) / 10
-    : 0;
+      calculateRunOutDays(
+        currentMonthTransactions,
+        daysElapsed
+      );
     /* ============================================================
       RENDER
     ============================================================ */

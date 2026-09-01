@@ -28,6 +28,10 @@ import { useEffect, useMemo, useState } from 'react';
 import { Reveal } from '@/lib/animations';
 import { supabase } from '@/lib/supabase';
 import {
+  isFixedTransaction,
+  isVariableTransaction,
+} from '@/lib/financial';
+import {
   MonthSelector,
   type SelectedPeriod,
 } from '@/components/MonthSelector';
@@ -199,30 +203,6 @@ export function InsightsPage() {
      BASIC TRANSACTION GROUPS
   ============================================================ */
 
-  /* ============================================================
-     FIXED / VARIABLE CLASSIFICATION
-
-     Fixed transactions are real expenses and therefore remain in
-     totalExpense / cash-flow views, but they MUST NOT participate
-     in discretionary spending analytics.
-
-     Support both fields for backward compatibility:
-     - isFixed === true
-     - expenseType === 'fixed'
-
-     Everything else is treated as VARIABLE.
-  ============================================================ */
-
-  const isFixedExpense = (transaction: Transaction) =>
-    transaction.type === 'expense' &&
-    (
-      transaction.isFixed === true ||
-      String(transaction.expenseType || '').toLowerCase() === 'fixed'
-    );
-
-  const isVariableExpense = (transaction: Transaction) =>
-    transaction.type === 'expense' && !isFixedExpense(transaction);
-
   const expenses = useMemo(
     () =>
       periodTransactions.filter(
@@ -282,19 +262,19 @@ export function InsightsPage() {
      - Personal spending
      - Other discretionary expenses
 
-     Old transactions without expenseType are treated
+     Transactions without a fixed marker are treated
      as VARIABLE so existing data continues to work.
   ============================================================ */
 
   const fixedExpenses = useMemo(
     () =>
-      expenses.filter((transaction) => isFixedExpense(transaction)),
+      expenses.filter((transaction) => isFixedTransaction(transaction)),
     [expenses]
   );
 
   const variableExpenses = useMemo(
     () =>
-      expenses.filter((transaction) => isVariableExpense(transaction)),
+      expenses.filter((transaction) => isVariableTransaction(transaction)),
     [expenses]
   );
 

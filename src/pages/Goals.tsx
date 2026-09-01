@@ -70,9 +70,16 @@ function calculateRequiredDaily(
   savedAmount: number,
   deadline: string
 ): number {
+  const safeTarget = Number.isFinite(targetAmount)
+    ? Math.max(0, targetAmount)
+    : 0;
+  const safeSaved = Number.isFinite(savedAmount)
+    ? Math.max(0, savedAmount)
+    : 0;
+
   const remaining = Math.max(
     0,
-    targetAmount - savedAmount
+    safeTarget - safeSaved
   );
 
   if (remaining <= 0) {
@@ -91,9 +98,16 @@ function calculateRequiredWeekly(
   savedAmount: number,
   deadline: string
 ): number {
+  const safeTarget = Number.isFinite(targetAmount)
+    ? Math.max(0, targetAmount)
+    : 0;
+  const safeSaved = Number.isFinite(savedAmount)
+    ? Math.max(0, savedAmount)
+    : 0;
+
   const remaining = Math.max(
     0,
-    targetAmount - savedAmount
+    safeTarget - safeSaved
   );
 
   if (remaining <= 0) {
@@ -116,9 +130,16 @@ function calculateRequiredMonthly(
   savedAmount: number,
   deadline: string
 ): number {
+  const safeTarget = Number.isFinite(targetAmount)
+    ? Math.max(0, targetAmount)
+    : 0;
+  const safeSaved = Number.isFinite(savedAmount)
+    ? Math.max(0, savedAmount)
+    : 0;
+
   const remaining = Math.max(
     0,
-    targetAmount - savedAmount
+    safeTarget - safeSaved
   );
 
   if (remaining <= 0) {

@@ -2,6 +2,10 @@ import { useEffect, useState } from 'react';
 import { Check, AlertTriangle } from 'lucide-react';
 import { Reveal } from '@/lib/animations';
 import { supabase } from '@/lib/supabase';
+import {
+  isExpense,
+  isFixedTransaction,
+} from '@/lib/financial';
 
 type Transaction = {
   id?: string;
@@ -183,7 +187,7 @@ expenses.forEach((transaction: Transaction) => {
   const category = transaction.category || 'Other';
 
   const expenseType: 'fixed' | 'variable' =
-    isFixedExpense(transaction)
+    isFixedTransaction(transaction)
       ? 'fixed'
       : 'variable';
 

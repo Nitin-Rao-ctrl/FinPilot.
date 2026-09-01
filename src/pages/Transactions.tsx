@@ -52,6 +52,7 @@ type Transaction = {
   category: string;
 
   expenseType?: "fixed" | "variable";
+  isFixed?: boolean;
 
   description: string;
 
@@ -550,12 +551,18 @@ function normalizeTransaction(
     category:
       transaction?.category || "Other",
 
-    // Preserve the fixed/variable tag returned by the backend.
-    // Old transactions without expenseType remain variable.
+    // Support both fields for backward compatibility.
+    // A transaction is fixed when either isFixed === true
+    // or expenseType === "fixed".
     expenseType:
-      transaction?.expenseType === "fixed"
+      transaction?.isFixed === true ||
+      String(transaction?.expenseType || "").toLowerCase() === "fixed"
         ? "fixed"
         : "variable",
+
+    isFixed:
+      transaction?.isFixed === true ||
+      String(transaction?.expenseType || "").toLowerCase() === "fixed",
 
     description:
       transaction?.description || "",
@@ -1349,7 +1356,7 @@ const filtered = useMemo(() => {
                             </span>
 
                             {transaction.type === "expense" &&
-                              transaction.expenseType === "fixed" && (
+                              (transaction.isFixed === true || transaction.expenseType === "fixed") && (
                                 <span className="inline-flex items-center rounded-full border border-amber-400/20 bg-amber-400/10 px-2 py-0.5 text-[10px] font-semibold text-amber-400">
                                   Fixed
                                 </span>
@@ -1502,7 +1509,7 @@ const filtered = useMemo(() => {
                     </span>
 
                     {deleteTarget.type === "expense" &&
-                      deleteTarget.expenseType === "fixed" && (
+                      (deleteTarget.isFixed === true || deleteTarget.expenseType === "fixed") && (
                         <span className="inline-flex items-center rounded-full border border-amber-400/20 bg-amber-400/10 px-2 py-0.5 text-[10px] font-semibold text-amber-400">
                           Fixed
                         </span>
@@ -1689,7 +1696,10 @@ function TransactionForm({
     );
     const [expenseType, setExpenseType] =
   useState<"fixed" | "variable">(
-    editing?.expenseType || "variable",
+    editing?.isFixed === true ||
+    editing?.expenseType === "fixed"
+      ? "fixed"
+      : "variable",
   );
 
   const [description, setDescription] =
@@ -1825,7 +1835,11 @@ function TransactionForm({
       category,
 expenseType:
   type === "expense" ? expenseType : undefined,
-description:
+      isFixed:
+        type === "expense"
+          ? expenseType === "fixed"
+          : false,
+      description:
   description.trim(),
       merchant:
         merchant.trim(),

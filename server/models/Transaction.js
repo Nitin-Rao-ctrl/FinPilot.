@@ -34,6 +34,14 @@ const transactionSchema = new mongoose.Schema(
       default: 'variable',
     },
 
+    // Backward-compatible fixed expense flag
+    // true = fixed commitment
+    // false = variable/discretionary expense
+    isFixed: {
+      type: Boolean,
+      default: false,
+    },
+
     description: {
       type: String,
       default: '',

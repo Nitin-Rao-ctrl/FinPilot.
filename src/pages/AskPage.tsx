@@ -80,46 +80,13 @@ const CATEGORIES: Category[] = [
 ];
 
 
-function isIncomeTransaction(
-  transaction: Transaction
-): boolean {
-  return (
-    String(transaction.type || '').toLowerCase() === 'income'
-  );
-}
+import {
+  isIncome,
+  isExpense,
+  isFixedTransaction,
+  isVariableTransaction,
+} from '@/lib/financial';
 
-function isExpenseTransaction(
-  transaction: Transaction
-): boolean {
-  const type = String(transaction.type || '').toLowerCase();
-
-  return (
-    type === 'expense' ||
-    type === 'debit' ||
-    type === 'spent'
-  );
-}
-
-function isFixedExpense(
-  transaction: Transaction
-): boolean {
-  return (
-    isExpenseTransaction(transaction) &&
-    (
-      transaction.isFixed === true ||
-      String(transaction.expenseType || '').toLowerCase() === 'fixed'
-    )
-  );
-}
-
-function isVariableExpense(
-  transaction: Transaction
-): boolean {
-  return (
-    isExpenseTransaction(transaction) &&
-    !isFixedExpense(transaction)
-  );
-}
 
 function getCurrentBalance(
   transactions: Transaction[]
@@ -134,11 +101,11 @@ function getCurrentBalance(
         return balance;
       }
 
-      if (isIncomeTransaction(transaction)) {
+      if (isIncome(transaction)) {
         return balance + amount;
       }
 
-      if (isExpenseTransaction(transaction)) {
+      if (isExpense(transaction)) {
         return balance - amount;
       }
 
@@ -180,13 +147,13 @@ function getPeriodSpent(
 ): number {
   return transactions.reduce(
     (total, transaction) => {
-      if (!isExpenseTransaction(transaction)) {
+      if (!isExpense(transaction)) {
         return total;
       }
 
       if (
         mode === 'variable' &&
-        !isVariableExpense(transaction)
+        !isVariableTransaction(transaction)
       ) {
         return total;
       }
@@ -211,7 +178,7 @@ function getCategorySpent(
   return transactions.reduce(
     (total, transaction) => {
       if (
-        !isVariableExpense(transaction) ||
+        !isVariableTransaction(transaction) ||
         (transaction.category || 'Other') !== category
       ) {
         return total;
@@ -789,7 +756,7 @@ const response = await fetch(
               )
                 .filter(
                   (transaction) =>
-                    isIncomeTransaction(transaction)
+                    isIncome(transaction)
                 )
                 .reduce(
                   (sum, transaction) =>
