@@ -33,6 +33,10 @@
 
   import { CountUp, Reveal } from '@/lib/animations';
   import { supabase } from '@/lib/supabase';
+  import {
+  MonthSelector,
+  type SelectedPeriod,
+} from '@/components/MonthSelector';
 
   const PIE_COLORS = [
     '#00FF88',
@@ -64,8 +68,47 @@
     >(null);
 
     const [transactions, setTransactions] = useState<Transaction[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [userName, setUserName] = useState('User');
+const [loading, setLoading] = useState(true);
+const [userName, setUserName] = useState('User');
+
+const [selectedPeriod, setSelectedPeriod] =
+  useState<SelectedPeriod>(() => {
+    try {
+      const saved = localStorage.getItem(
+        'finpilot_selected_period'
+      );
+
+      if (saved) {
+        const parsed = JSON.parse(saved);
+
+        if (parsed?.type === 'all') {
+          return { type: 'all' };
+        }
+
+        if (
+          parsed?.type === 'month' &&
+          typeof parsed.year === 'number' &&
+          typeof parsed.month === 'number'
+        ) {
+          return {
+            type: 'month',
+            year: parsed.year,
+            month: parsed.month,
+          };
+        }
+      }
+    } catch {
+      // Ignore invalid saved period
+    }
+
+    const now = new Date();
+
+    return {
+      type: 'month',
+      year: now.getFullYear(),
+      month: now.getMonth(),
+    };
+  });
     
 
     /* ============================================================
@@ -146,21 +189,47 @@ useEffect(() => {
       BASIC TOTALS
     ============================================================ */
 
-    const totalIncome = transactions
-      .filter((t) => t.type === 'income')
-      .reduce(
-        (sum, t) =>
-          sum + Number(t.amount || 0),
-        0
-      );
+    /* ============================================================
+  SELECTED PERIOD TRANSACTIONS
+============================================================ */
 
-    const totalExpense = transactions
-      .filter((t) => t.type === 'expense')
-      .reduce(
-        (sum, t) =>
-          sum + Number(t.amount || 0),
-        0
-      );
+const selectedTransactions =
+  selectedPeriod.type === 'all'
+    ? transactions
+    : transactions.filter((t) => {
+        if (!t.date) return false;
+
+        const date = new Date(t.date);
+
+        if (Number.isNaN(date.getTime())) {
+          return false;
+        }
+
+        return (
+          date.getMonth() === selectedPeriod.month &&
+          date.getFullYear() === selectedPeriod.year
+        );
+      });
+
+/* ============================================================
+  BASIC TOTALS
+============================================================ */
+
+const totalIncome = selectedTransactions
+  .filter((t) => t.type === 'income')
+  .reduce(
+    (sum, t) =>
+      sum + Number(t.amount || 0),
+    0
+  );
+
+const totalExpense = selectedTransactions
+  .filter((t) => t.type === 'expense')
+  .reduce(
+    (sum, t) =>
+      sum + Number(t.amount || 0),
+    0
+  );
 
     const balance = totalIncome - totalExpense;
 
@@ -179,8 +248,8 @@ useEffect(() => {
       CURRENT MONTH TRANSACTIONS
     ============================================================ */
 
-    const currentMonthTransactions =
-      transactions.filter((t) => {
+   const currentMonthTransactions =
+  selectedTransactions.filter((t) => {
         if (!t.date) return true;
 
         const date = new Date(t.date);
@@ -702,47 +771,71 @@ if (expenseTransactions.length > 0) {
       missingDays: 0,
     };
 
-    /* ============================================================
-      CASHFLOW FORECAST
-    ============================================================ */
+   /* ============================================================
+  CASHFLOW FORECAST
+============================================================ */
 
-  const forecastDays = Math.max(daysElapsed, 1);
+const now = new Date();
+
+const isCurrentMonth =
+  selectedPeriod.type === 'month' &&
+  selectedPeriod.month === now.getMonth() &&
+  selectedPeriod.year === now.getFullYear();
+
+/*
+ * Forecast is only meaningful for the current month.
+ * Previous months are already completed, so we show
+ * their actual final numbers instead of predicting them.
+ */
+
+const forecastDays = Math.max(daysElapsed, 1);
 
 const averageDailyExpense =
-  currentMonthExpense > 0
+  isCurrentMonth && currentMonthExpense > 0
     ? currentMonthExpense / forecastDays
     : 0;
 
-const projectedRemainingExpense = Math.round(
-  averageDailyExpense * daysRemaining
-);
+const projectedRemainingExpense =
+  isCurrentMonth
+    ? Math.round(
+        averageDailyExpense * daysRemaining
+      )
+    : 0;
 
-const projectedMonthEndExpense = Math.round(
-  currentMonthExpense +
-    projectedRemainingExpense
-);
+const projectedMonthEndExpense =
+  isCurrentMonth
+    ? Math.round(
+        currentMonthExpense +
+          projectedRemainingExpense
+      )
+    : currentMonthExpense;
 
-const projectedMonthEndBalance = Math.round(
-  currentMonthBalance -
-    projectedRemainingExpense
-);
-    
+const projectedMonthEndBalance =
+  isCurrentMonth
+    ? Math.round(
+        currentMonthBalance -
+          projectedRemainingExpense
+      )
+    : currentMonthBalance;
 
-    const forecastStatus =
-      projectedMonthEndBalance < 0
-        ? 'danger'
-        : projectedMonthEndBalance <
-          currentMonthBalance * 0.25
-        ? 'warning'
-        : 'positive';
+const forecastStatus =
+  !isCurrentMonth
+    ? 'positive'
+    : projectedMonthEndBalance < 0
+    ? 'danger'
+    : projectedMonthEndBalance <
+      currentMonthBalance * 0.25
+    ? 'warning'
+    : 'positive';
 
-    const forecastMessage =
-      forecastStatus === 'danger'
-        ? 'At your current spending rate, your expenses may exceed your available cash before the month ends.'
-        : forecastStatus === 'warning'
-        ? 'Your current spending rate suggests a low month-end balance. Consider reducing discretionary spending.'
-        : 'Your current spending rate looks manageable for the rest of the month.';
-
+const forecastMessage =
+  !isCurrentMonth
+    ? 'This month is complete. These are your actual final numbers.'
+    : forecastStatus === 'danger'
+    ? 'At your current spending rate, your expenses may exceed your available cash before the month ends.'
+    : forecastStatus === 'warning'
+    ? 'Your current spending rate suggests a low month-end balance. Consider reducing discretionary spending.'
+    : 'Your current spending rate looks manageable for the rest of the month.';
     /* ============================================================
       RUN-OUT WARNING
     ============================================================ */
@@ -1081,12 +1174,16 @@ const projectedMonthEndBalance = Math.round(
               <div>
 
                 <span className="metric-label">
-                  Cashflow Forecast
-                </span>
+  {isCurrentMonth
+    ? 'Cashflow Forecast'
+    : 'Monthly Summary'}
+</span>
 
-                <p className="text-xs text-gray-500 mt-1">
-                  Based on your spending pace this month
-                </p>
+<p className="text-xs text-gray-500 mt-1">
+  {isCurrentMonth
+    ? 'Based on your spending pace this month'
+    : 'Actual results for this month'}
+</p>
 
               </div>
 
@@ -1123,9 +1220,13 @@ const projectedMonthEndBalance = Math.round(
               />
 
               <ForecastCard
-                label="Expected Remaining"
-                value={projectedRemainingExpense}
-              />
+  label={
+    isCurrentMonth
+      ? 'Expected Remaining'
+      : 'Remaining'
+  }
+  value={projectedRemainingExpense}
+/>
 
               <ForecastCard
                 label="Month-End Balance"
@@ -1149,8 +1250,10 @@ const projectedMonthEndBalance = Math.round(
                 </span>
 
                 <span className="text-xs text-gray-400">
-                  {daysElapsed} / {daysInCurrentMonth} days
-                </span>
+  {isCurrentMonth
+    ? `${daysElapsed} / ${daysInCurrentMonth} days`
+    : 'Month completed'}
+</span>
 
               </div>
 
@@ -1159,15 +1262,16 @@ const projectedMonthEndBalance = Math.round(
                 <div
                   className="h-full bg-gradient-to-r from-emerald-500 to-emerald-400 rounded-full transition-all"
                   style={{
-                    width: `${Math.min(
-                      100,
-                      (daysElapsed /
-                        daysInCurrentMonth) *
-                        100
-                    )}%`,
+                    width: `${
+                      isCurrentMonth
+                        ? Math.min(
+                            100,
+                            (daysElapsed / daysInCurrentMonth) * 100
+                          )
+                        : 100
+                    }%`,
                   }}
                 />
-
               </div>
 
             </div>
