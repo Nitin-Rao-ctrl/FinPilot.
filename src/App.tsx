@@ -17,7 +17,7 @@ import { AskPage } from '@/pages/AskPage';
 import { LoansPage } from '@/pages/Loans';
 import { ProfilePage } from '@/pages/Profile';
 import { SettingsPage } from '@/pages/settings';
-import { WhatIfPage } from '@/pages/WhatIf';
+
 import { LoginPage } from '@/pages/Login';
 
 // Keep the route usable until TransactionsPage's return type is corrected.
@@ -81,11 +81,7 @@ export default function App() {
             element={<DashboardPage />}
           />
 
-          {/* What-If Simulator */}
-          <Route
-            path="/what-if"
-            element={<WhatIfPage />}
-          />
+          
 
           {/* Transactions */}
           <Route

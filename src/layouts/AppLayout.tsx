@@ -65,11 +65,7 @@ const navItems = [
     label: 'Loans',
     icon: HandCoins,
   },
-  {
-    to: '/what-if',
-    label: 'What-If Simulator',
-    icon: Lightbulb,
-  },
+  
   {
     to: '/profile',
     label: 'Profile',
