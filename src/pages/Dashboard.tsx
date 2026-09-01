@@ -751,14 +751,15 @@ const projectedMonthEndBalance = Math.round(
           daysElapsed
         : 0;
 
-    const runOutDays =
+   const runOutDays =
   averageDailySpend > 0 &&
   currentMonthBalance > 0
     ? Math.round(
-        (currentMonthBalance / averageDailySpend) * 10
+        (currentMonthBalance /
+          averageDailySpend) *
+          10
       ) / 10
     : 0;
-
     /* ============================================================
       RENDER
     ============================================================ */
