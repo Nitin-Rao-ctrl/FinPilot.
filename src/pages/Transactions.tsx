@@ -1543,7 +1543,7 @@ const filtered = useMemo(() => {
                   onClick={() =>
                     setDeleteTarget(null)
                   }
-                  className="flex-1 rounded-xl border border-white/[0.08] px-4 py-3 text-sm font-medium text-gray-300 hover:text-white hover:bg-white/[0.05] transition"
+                  className="flex-1 rounded-xl border border-white/[0.08] px-4 py-2.5 text-sm font-medium text-gray-300 hover:text-white hover:bg-white/[0.05] transition"
                 >
                   Cancel
                 </button>
@@ -1552,7 +1552,7 @@ const filtered = useMemo(() => {
                   type="button"
                   disabled={actionLoading}
                   onClick={confirmDelete}
-                  className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-red-500 px-4 py-3 text-sm font-semibold text-white hover:bg-red-400 transition disabled:opacity-50"
+                  className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-red-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-400 transition disabled:opacity-50"
                 >
                   {actionLoading ? (
                     <>
@@ -1604,7 +1604,7 @@ const filtered = useMemo(() => {
               onClick={() =>
                 setDeleteSuccess(false)
               }
-              className="mt-6 w-full rounded-xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-black hover:bg-emerald-400 transition"
+              className="mt-6 w-full rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-black hover:bg-emerald-400 transition"
             >
               Done
             </button>
@@ -1643,7 +1643,7 @@ const filtered = useMemo(() => {
               onClick={() =>
                 setErrorMessage(null)
               }
-              className="mt-6 w-full rounded-xl bg-white/[0.08] border border-white/[0.08] px-4 py-3 text-sm font-semibold text-white hover:bg-white/[0.12] transition"
+              className="mt-6 w-full rounded-xl bg-white/[0.08] border border-white/[0.08] px-4 py-2.5 text-sm font-semibold text-white hover:bg-white/[0.12] transition"
             >
               Close
             </button>
@@ -1838,11 +1838,19 @@ description:
   ========================================================== */
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-      <div className="w-full max-w-lg rounded-2xl border border-white/[0.1] bg-[#101313] shadow-2xl overflow-hidden">
-        {/* HEADER */}
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-3 bg-black/70 backdrop-blur-sm">
+      <div
+        className="
+          w-full max-w-md sm:max-w-lg
+          h-[calc(100dvh-1.5rem)] max-h-[760px]
+          rounded-2xl border border-white/[0.1]
+          bg-[#101313] shadow-2xl overflow-hidden
+          flex flex-col min-h-0
+        "
+      >
+        {/* HEADER - always visible */}
 
-        <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.08]">
+        <div className="shrink-0 flex items-center justify-between px-5 py-3 border-b border-white/[0.08]">
           <div>
             <h2 className="text-lg font-semibold text-white">
               {editing
@@ -1869,119 +1877,140 @@ description:
 
         <form
           onSubmit={handleSubmit}
-          className="p-5 space-y-5"
+          className="flex flex-1 min-h-0 flex-col"
         >
-          {/* TYPE */}
+          {/* SCROLLABLE FORM BODY */}
 
-          <div>
-            <label className="block text-xs font-medium text-gray-400 mb-2">
-              Type
-            </label>
+          <div
+            className="
+              flex-1 min-h-0 overflow-y-auto
+              overscroll-contain touch-pan-y
+              px-5 py-4 space-y-4
+              [scrollbar-width:thin]
+            "
+          >
+            {/* TYPE */}
 
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() =>
-                  setType("expense")
-                }
-                className={`rounded-xl border px-4 py-3 text-sm font-medium transition ${
-                  type === "expense"
-                    ? "border-red-400/40 bg-red-400/10 text-red-400"
-                    : "border-white/[0.08] text-gray-500"
-                }`}
-              >
-                Expense
-              </button>
+            <div>
+              <label className="block text-[11px] font-medium text-gray-400 mb-1">
+                Type
+              </label>
 
-              <button
-                type="button"
-                onClick={() =>
-                  setType("income")
-                }
-                className={`rounded-xl border px-4 py-3 text-sm font-medium transition ${
-                  type === "income"
-                    ? "border-emerald-400/40 bg-emerald-400/10 text-emerald-400"
-                    : "border-white/[0.08] text-gray-500"
-                }`}
-              >
-                Income
-              </button>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setType("expense")
+                  }
+                  className={`rounded-xl border px-4 py-2.5 text-sm font-medium transition ${
+                    type === "expense"
+                      ? "border-red-400/40 bg-red-400/10 text-red-400"
+                      : "border-white/[0.08] text-gray-500"
+                  }`}
+                >
+                  Expense
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setType("income")
+                  }
+                  className={`rounded-xl border px-4 py-2.5 text-sm font-medium transition ${
+                    type === "income"
+                      ? "border-emerald-400/40 bg-emerald-400/10 text-emerald-400"
+                      : "border-white/[0.08] text-gray-500"
+                  }`}
+                >
+                  Income
+                </button>
+              </div>
             </div>
-          </div>
 
-          {/* AMOUNT */}
+            {/* AMOUNT + DATE */}
 
-          <div>
-            <label className="block text-xs font-medium text-gray-400 mb-2">
-              Amount
-            </label>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[11px] font-medium text-gray-400 mb-1">
+                  Amount
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={amount}
+                  onChange={(event) =>
+                    setAmount(event.target.value)
+                  }
+                  placeholder="0.00"
+                  className="w-full rounded-xl border border-white/[0.08] bg-black/20 px-3 py-2 text-sm text-white outline-none focus:border-emerald-400/40"
+                  required
+                />
+              </div>
 
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              value={amount}
-              onChange={(event) =>
-                setAmount(
-                  event.target.value,
-                )
-              }
-              placeholder="0.00"
-              className="w-full rounded-xl border border-white/[0.08] bg-black/20 px-4 py-3 text-sm text-white outline-none focus:border-emerald-400/40"
-              required
-            />
-          </div>
+              <div>
+                <label className="block text-[11px] font-medium text-gray-400 mb-1">
+                  Date
+                </label>
+                <input
+                  type="date"
+                  value={date}
+                  onChange={(event) =>
+                    setDate(event.target.value)
+                  }
+                  className="w-full rounded-xl border border-white/[0.08] bg-black/20 px-3 py-2 text-sm text-white outline-none focus:border-emerald-400/40"
+                  required
+                />
+              </div>
+            </div>
 
-          {/* DESCRIPTION */}
+            {/* DESCRIPTION + MERCHANT */}
 
-          <div>
-            <label className="block text-xs font-medium text-gray-400 mb-2">
-              Description
-            </label>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[11px] font-medium text-gray-400 mb-1">
+                  Description
+                </label>
+                <input
+                  type="text"
+                  value={description}
+                  onChange={(event) =>
+                    setDescription(event.target.value)
+                  }
+                  placeholder={
+                    type === "income"
+                      ? "Salary / freelance"
+                      : "e.g. Rent, food, movie"
+                  }
+                  className="w-full rounded-xl border border-white/[0.08] bg-black/20 px-3 py-2 text-sm text-white outline-none focus:border-emerald-400/40"
+                  required
+                />
+              </div>
 
-            <input
-              type="text"
-              value={description}
-              onChange={(event) =>
-                setDescription(
-                  event.target.value,
-                )
-              }
-              placeholder={
-  type === "income"
-    ? "e.g. Monthly salary, freelance payment, client payment"
-    : "e.g. Chocolate from supermarket"
-}
-              className="w-full rounded-xl border border-white/[0.08] bg-black/20 px-4 py-3 text-sm text-white outline-none focus:border-emerald-400/40"
-              required
-            />
-          </div>
+              <div>
+                <label className="block text-[11px] font-medium text-gray-400 mb-1">
+                  Merchant
+                </label>
+                <input
+                  type="text"
+                  value={merchant}
+                  onChange={(event) =>
+                    setMerchant(event.target.value)
+                  }
+                  placeholder="Amazon, Uber, Zomato"
+                  className="w-full rounded-xl border border-white/[0.08] bg-black/20 px-3 py-2 text-sm text-white outline-none focus:border-emerald-400/40"
+                  required
+                />
+              </div>
+            </div>
 
-          {/* MERCHANT */}
+            {/* PREDICTION */}
 
-          <div>
-            <label className="block text-xs font-medium text-gray-400 mb-2">
-              Merchant
-            </label>
+            
 
-            <input
-              type="text"
-              value={merchant}
-              onChange={(event) =>
-                setMerchant(
-                  event.target.value,
-                )
-              }
-              placeholder="e.g. Amazon, Uber, Zomato"
-              className="w-full rounded-xl border border-white/[0.08] bg-black/20 px-4 py-3 text-sm text-white outline-none focus:border-emerald-400/40"
-            />
-          </div>
-
-          {/* PREDICTION */}
-
-          {((type === "expense" || type === "income") &&
-  (description.trim().length >= 2 ||
-   merchant.trim().length >= 2)) && (
+            {((type === "expense" || type === "income") &&
+              (description.trim().length >= 2 ||
+                merchant.trim().length >= 2)) && (
               <div className="flex items-center gap-3 rounded-xl border border-emerald-400/15 bg-emerald-400/[0.05] px-4 py-3">
                 {isPredicting ? (
                   <Loader2 className="w-4 h-4 text-emerald-400 animate-spin" />
@@ -2009,103 +2038,112 @@ description:
               </div>
             )}
 
-          {/* CATEGORY */}
+            {/* CATEGORY */}
 
-          <div>
-            <label className="block text-xs font-medium text-gray-400 mb-2">
-              Category
-            </label>
+            <div>
+              <label className="block text-[11px] font-medium text-gray-400 mb-1">
+                Category
+              </label>
 
-            <select
-              value={category}
-              onChange={(event) =>
-                handleManualCategoryChange(
-                  event.target.value,
-                )
-              }
-              className="w-full rounded-xl border border-white/[0.08] bg-black/20 px-4 py-3 text-sm text-white outline-none focus:border-emerald-400/40"
-            >
-              {CATEGORIES.map(
-                (item) => (
-                  <option
-                    key={item}
-                    value={item}
+              <select
+                value={category}
+                onChange={(event) =>
+                  handleManualCategoryChange(
+                    event.target.value,
+                  )
+                }
+                className="w-full rounded-xl border border-white/[0.08] bg-black/20 px-3 py-2 text-sm text-white outline-none focus:border-emerald-400/40"
+              >
+                {CATEGORIES.map(
+                  (item) => (
+                    <option
+                      key={item}
+                      value={item}
+                    >
+                      {item}
+                    </option>
+                  ),
+                )}
+              </select>
+            </div>
+
+            {/* EXPENSE TYPE */}
+
+            {type === "expense" && (
+              <div>
+                <label className="block text-[11px] font-medium text-gray-400 mb-1">
+                  Expense Type
+                </label>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setExpenseType("variable")
+                    }
+                    className={`rounded-xl border px-4 py-2.5 text-sm font-medium transition ${
+                      expenseType === "variable"
+                        ? "border-emerald-400/40 bg-emerald-400/10 text-emerald-400"
+                        : "border-white/[0.08] text-gray-500"
+                    }`}
                   >
-                    {item}
-                  </option>
-                ),
-              )}
-            </select>
-          </div>
-          {/* EXPENSE TYPE */}
+                    Variable
+                  </button>
 
-{type === "expense" && (
-  <div>
-    <label className="block text-xs font-medium text-gray-400 mb-2">
-      Expense Type
-    </label>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setExpenseType("fixed")
+                    }
+                    className={`rounded-xl border px-4 py-2.5 text-sm font-medium transition ${
+                      expenseType === "fixed"
+                        ? "border-amber-400/40 bg-amber-400/10 text-amber-400"
+                        : "border-white/[0.08] text-gray-500"
+                    }`}
+                  >
+                    Fixed
+                  </button>
+                </div>
 
-    <div className="grid grid-cols-2 gap-2">
-      <button
-        type="button"
-        onClick={() => setExpenseType("variable")}
-        className={`rounded-xl border px-4 py-3 text-sm font-medium transition ${
-          expenseType === "variable"
-            ? "border-emerald-400/40 bg-emerald-400/10 text-emerald-400"
-            : "border-white/[0.08] text-gray-500"
-        }`}
-      >
-        Variable
-      </button>
+                <p className="text-[10px] text-gray-500 mt-1">
+                  Fixed expenses like rent, EMI or mess fees won't affect
+                  your variable spending insights.
+                </p>
+              </div>
+            )}
 
-      <button
-        type="button"
-        onClick={() => setExpenseType("fixed")}
-        className={`rounded-xl border px-4 py-3 text-sm font-medium transition ${
-          expenseType === "fixed"
-            ? "border-amber-400/40 bg-amber-400/10 text-amber-400"
-            : "border-white/[0.08] text-gray-500"
-        }`}
-      >
-        Fixed
-      </button>
-    </div>
+            {/* DATE */}
 
-    <p className="text-[11px] text-gray-500 mt-2">
-      Fixed expenses like rent, EMI or mess fees won't affect
-      your variable spending insights.
-    </p>
-  </div>
-)}
+            <div>
+              <label className="block text-[11px] font-medium text-gray-400 mb-1">
+                Date
+              </label>
 
-          {/* DATE */}
+              <input
+                type="date"
+                value={date}
+                onChange={(event) =>
+                  setDate(
+                    event.target.value,
+                  )
+                }
+                className="w-full rounded-xl border border-white/[0.08] bg-black/20 px-3 py-2 text-sm text-white outline-none focus:border-emerald-400/40"
+                required
+              />
+            </div>
 
-          <div>
-            <label className="block text-xs font-medium text-gray-400 mb-2">
-              Date
-            </label>
-
-            <input
-              type="date"
-              value={date}
-              onChange={(event) =>
-                setDate(
-                  event.target.value,
-                )
-              }
-              className="w-full rounded-xl border border-white/[0.08] bg-black/20 px-4 py-3 text-sm text-white outline-none focus:border-emerald-400/40"
-              required
-            />
+            {/* Extra bottom space so the last field is never hidden behind the footer */}
+            <div className="h-1" aria-hidden="true" />
           </div>
 
-          {/* BUTTONS */}
+          {/* STICKY FOOTER - always visible */}
 
-          <div className="flex gap-3 pt-2">
+          <div className="shrink-0 flex gap-3 border-t border-white/[0.08] bg-[#101313] px-5 py-3">
             <button
               type="button"
               onClick={onClose}
               disabled={saving}
-              className="flex-1 rounded-xl border border-white/[0.08] px-4 py-3 text-sm font-medium text-gray-400 hover:text-white hover:bg-white/[0.04]"
+              className="flex-1 rounded-xl border border-white/[0.08] px-4 py-2.5 text-sm font-medium text-gray-400 hover:text-white hover:bg-white/[0.04] disabled:opacity-50"
             >
               Cancel
             </button>
@@ -2113,7 +2151,7 @@ description:
             <button
               type="submit"
               disabled={saving}
-              className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-black hover:bg-emerald-400 disabled:opacity-50"
+              className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-black hover:bg-emerald-400 disabled:opacity-50"
             >
               {saving && (
                 <Loader2 className="w-4 h-4 animate-spin" />
