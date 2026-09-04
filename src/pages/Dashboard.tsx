@@ -138,23 +138,78 @@ const [selectedPeriod] =
       LOAD TRANSACTIONS
     ============================================================ */
 useEffect(() => {
+  let cancelled = false;
+
   async function loadTransactions() {
+    let userId: string | null = null;
+    let cacheKey = '';
+
     try {
-      setLoading(true);
-
+      /*
+       * getSession() restores the already-persisted Supabase session
+       * locally. Do not use getUser() here because that can trigger an
+       * additional Auth network request on every dashboard mount.
+       */
       const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser();
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
 
-      if (userError || !user) {
-        throw new Error('User is not logged in');
+      if (sessionError || !session?.user) {
+        throw new Error('User session is unavailable');
       }
+
+      if (cancelled) return;
+
+      const user = session.user;
+      userId = user.id;
+      cacheKey = `finpilot_transactions_${userId}`;
+
+      const name =
+        user.user_metadata?.full_name ||
+        user.user_metadata?.name ||
+        user.user_metadata?.user_name ||
+        user.email?.split('@')[0] ||
+        'User';
+
+      setUserName(name);
+
+      /*
+       * STALE-WHILE-REVALIDATE:
+       * Show the last successful transaction snapshot immediately so the
+       * Dashboard does not sit at ₹0 while Render/MongoDB wakes up.
+       * The fresh API response replaces this data in the background.
+       */
+      try {
+        const cached = localStorage.getItem(cacheKey);
+
+        if (cached) {
+          const parsed = JSON.parse(cached);
+
+          if (Array.isArray(parsed)) {
+            setTransactions(parsed);
+            setLoading(false);
+          }
+        }
+      } catch (cacheError) {
+        console.warn(
+          'Unable to restore cached dashboard transactions:',
+          cacheError
+        );
+      }
+
+      if (cancelled) return;
+
 
       const response = await fetch(
         `https://finpilot-backend-23iz.onrender.com/api/transactions?userId=${encodeURIComponent(
-          user.id
-        )}`
+          userId
+        )}`,
+        {
+          headers: {
+            Accept: 'application/json',
+          },
+        }
       );
 
       if (!response.ok) {
@@ -164,49 +219,47 @@ useEffect(() => {
       }
 
       const data = await response.json();
+      const freshTransactions = Array.isArray(data) ? data : [];
 
-      setTransactions(
-        Array.isArray(data) ? data : []
-      );
+      if (cancelled) return;
+
+      setTransactions(freshTransactions);
+
+      try {
+        localStorage.setItem(
+          cacheKey,
+          JSON.stringify(freshTransactions)
+        );
+      } catch (cacheError) {
+        console.warn(
+          'Unable to cache dashboard transactions:',
+          cacheError
+        );
+      }
     } catch (error) {
       console.error(
         'Error loading dashboard transactions:',
         error
       );
 
-      setTransactions([]);
+      // Never erase a valid cached snapshot just because the backend
+      // is waking up or temporarily unavailable.
+      if (!cancelled && !userId) {
+        setTransactions([]);
+      }
     } finally {
-      setLoading(false);
+      if (!cancelled) {
+        setLoading(false);
+      }
     }
   }
 
   loadTransactions();
+
+  return () => {
+    cancelled = true;
+  };
 }, []);
-
-    /* ============================================================
-      LOAD LOGGED-IN USER
-    ============================================================ */
-
-    useEffect(() => {
-      async function loadUserName() {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-
-        if (!user) return;
-
-        const name =
-          user.user_metadata?.full_name ||
-          user.user_metadata?.name ||
-          user.user_metadata?.user_name ||
-          user.email?.split('@')[0] ||
-          'User';
-
-        setUserName(name);
-      }
-
-      loadUserName();
-    }, []);
 
     /* ============================================================
       BASIC TOTALS

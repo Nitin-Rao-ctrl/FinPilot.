@@ -1,15 +1,10 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl =
-  import.meta.env.VITE_SUPABASE_URL;
-
-const supabaseAnonKey =
-  import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error(
-    'Missing Supabase environment variables.'
-  );
+  throw new Error('Missing Supabase environment variables.');
 }
 
 export const supabase = createClient(
@@ -17,9 +12,11 @@ export const supabase = createClient(
   supabaseAnonKey,
   {
     auth: {
+      // Keep the authenticated session across browser/app restarts.
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: true,
+      storage: window.localStorage,
     },
   }
 );

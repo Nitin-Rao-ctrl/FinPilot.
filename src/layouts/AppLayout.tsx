@@ -87,95 +87,127 @@ export function AppLayout() {
 
   /*
    * ============================================================
-   * THEME
+   * AUTHENTICATION + THEME
    * ============================================================
    *
-   * Dark mode is ALWAYS the default.
+   * Supabase already persists the session in localStorage.
+   * AppLayout now restores that persisted session once and keeps
+   * the current user in memory instead of calling getUser()
+   * repeatedly.
    *
-   * Light mode is enabled only when the user explicitly
-   * switches to it.
-   *
-   * The preference is saved in localStorage.
+   * This prevents the protected app from rendering while the
+   * persisted session is still being restored and avoids extra
+   * authentication requests during normal navigation.
    */
+
+  const [authLoading, setAuthLoading] = useState(true);
+  const [userId, setUserId] = useState<string | null>(null);
 
   const [theme, setTheme] = useState<'dark' | 'light'>(
-    () => {
-      if (typeof window === 'undefined') {
-        return 'dark';
-      }
-
-      // Theme is resolved after authentication in the
-      // effect below. Default is always dark.
-      return 'dark';
-    }
+    () => 'dark'
   );
-
-  /*
-   * ============================================================
-   * APPLY THEME
-   * ============================================================
-   */
 
   useEffect(() => {
     let cancelled = false;
 
-    async function loadUserTheme() {
+    const loadUserTheme = (nextUserId: string | null) => {
+      if (!nextUserId) {
+        setTheme('dark');
+        return;
+      }
+
       try {
+        const savedTheme = localStorage.getItem(
+          `finpilot_theme_${nextUserId}`
+        );
+
+        setTheme(
+          savedTheme === 'light'
+            ? 'light'
+            : 'dark'
+        );
+      } catch (storageError) {
+        console.error(
+          'Failed to read saved theme:',
+          storageError
+        );
+        setTheme('dark');
+      }
+    };
+
+    async function restoreSession() {
+      try {
+        // getSession() reads the persisted Supabase session and
+        // avoids an unnecessary authenticated network request.
         const {
-          data: { user },
+          data: { session },
           error,
-        } = await supabase.auth.getUser();
+        } = await supabase.auth.getSession();
+
+        if (cancelled) return;
 
         if (error) {
           console.error(
-            'Failed to load authenticated user:',
+            'Failed to restore Supabase session:',
             error
           );
         }
 
-        if (!user || cancelled) {
-          setTheme('dark');
-          return;
-        }
+        const nextUserId = session?.user?.id ?? null;
 
-        const userThemeKey =
-          `finpilot_theme_${user.id}`;
-
-        let savedTheme: string | null = null;
-
-        try {
-          savedTheme = localStorage.getItem(userThemeKey);
-        } catch (storageError) {
-          console.error(
-            'Failed to read saved theme:',
-            storageError
-          );
-        }
-
-        const nextTheme =
-          savedTheme === 'light'
-            ? 'light'
-            : 'dark';
-
-        setTheme(nextTheme);
+        setUserId(nextUserId);
+        loadUserTheme(nextUserId);
+        setAuthLoading(false);
       } catch (error) {
         console.error(
-          'Failed to load user theme:',
+          'Failed to restore authenticated session:',
           error
         );
 
         if (!cancelled) {
+          setUserId(null);
           setTheme('dark');
+          setAuthLoading(false);
         }
       }
     }
 
-    loadUserTheme();
+    restoreSession();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        if (cancelled) return;
+
+        const nextUserId =
+          session?.user?.id ?? null;
+
+        setUserId(nextUserId);
+        loadUserTheme(nextUserId);
+        setAuthLoading(false);
+      }
+    );
 
     return () => {
       cancelled = true;
+      subscription.unsubscribe();
     };
   }, []);
+
+  /*
+   * If the persisted session is genuinely unavailable, do not
+   * render the protected application. Redirect only after
+   * session restoration has completed.
+   */
+
+  useEffect(() => {
+    if (authLoading) return;
+
+    if (!userId) {
+      window.location.replace('/login');
+    }
+  }, [authLoading, userId]);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -200,35 +232,18 @@ export function AppLayout() {
           ? 'light'
           : 'dark';
 
-      try {
-        void supabase.auth
-          .getUser()
-          .then(({ data: { user } }) => {
-            if (!user) return;
-
-            try {
-              localStorage.setItem(
-                `finpilot_theme_${user.id}`,
-                nextTheme
-              );
-            } catch (storageError) {
-              console.error(
-                'Failed to save theme:',
-                storageError
-              );
-            }
-          })
-          .catch((error) => {
-            console.error(
-              'Failed to load user while saving theme:',
-              error
-            );
-          });
-      } catch (error) {
-        console.error(
-          'Failed to persist theme:',
-          error
-        );
+      if (userId) {
+        try {
+          localStorage.setItem(
+            `finpilot_theme_${userId}`,
+            nextTheme
+          );
+        } catch (storageError) {
+          console.error(
+            'Failed to save theme:',
+            storageError
+          );
+        }
       }
 
       return nextTheme;
@@ -353,6 +368,20 @@ export function AppLayout() {
       )}
     </button>
   );
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-[#050505] text-gray-200 flex items-center justify-center">
+        <div className="text-sm text-gray-500">
+          Restoring your session...
+        </div>
+      </div>
+    );
+  }
+
+  if (!userId) {
+    return null;
+  }
 
   return (
     <div
