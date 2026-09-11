@@ -9,6 +9,7 @@
     FileText,
     Calendar,
     Check,
+    Undo2,
   } from 'lucide-react';
 
   import {
@@ -90,9 +91,64 @@
       'logged' | 'zero_spend' | null
     >(null);
 
+    const getTodayKey = () => {
+      const now = new Date();
+      return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    };
+
+    const todayTrackingKey = (userId: string) =>
+      `finpilot_today_tracking_${userId}_${getTodayKey()}`;
+
+    const hasTransactionToday = (list: Transaction[]) => {
+      const now = new Date();
+      return list.some((t) => {
+        if (!t.date) return false;
+        const date = new Date(t.date);
+        if (Number.isNaN(date.getTime())) return false;
+        return (
+          date.getDate() === now.getDate() &&
+          date.getMonth() === now.getMonth() &&
+          date.getFullYear() === now.getFullYear()
+        );
+      });
+    };
+
+    const syncTodayStatus = (list: Transaction[], userId: string) => {
+      // A transaction added for today is the strongest signal: the day is
+      // automatically considered logged, so the user is never asked again.
+      if (hasTransactionToday(list)) {
+        setTodayStatus('logged');
+        try {
+          localStorage.setItem(
+            todayTrackingKey(userId),
+            JSON.stringify({ status: 'logged', source: 'transaction' })
+          );
+        } catch {
+          // Ignore storage failures. The transaction itself remains the source of truth.
+        }
+        return;
+      }
+
+      try {
+        const saved = localStorage.getItem(todayTrackingKey(userId));
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed?.status === 'logged' || parsed?.status === 'zero_spend') {
+            setTodayStatus(parsed.status);
+            return;
+          }
+        }
+      } catch {
+        // Ignore invalid saved tracking state.
+      }
+
+      setTodayStatus(null);
+    };
+
     const [transactions, setTransactions] = useState<Transaction[]>([]);
 const [loading, setLoading] = useState(true);
 const [userName, setUserName] = useState('User');
+const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
 const [selectedPeriod] =
   useState<SelectedPeriod>(() => {
@@ -163,6 +219,7 @@ useEffect(() => {
 
       const user = session.user;
       userId = user.id;
+      setCurrentUserId(user.id);
       cacheKey = `finpilot_transactions_${userId}`;
 
       const name =
@@ -188,6 +245,7 @@ useEffect(() => {
 
           if (Array.isArray(parsed)) {
             setTransactions(parsed);
+            syncTodayStatus(parsed, userId);
             setLoading(false);
           }
         }
@@ -224,6 +282,7 @@ useEffect(() => {
       if (cancelled) return;
 
       setTransactions(freshTransactions);
+      syncTodayStatus(freshTransactions, userId);
 
       try {
         localStorage.setItem(
@@ -900,26 +959,25 @@ if (expenseTransactions.length > 0) {
       DATA CONFIDENCE
     ============================================================ */
 
-    const loggedDays =
-      transactions.length > 0
-        ? new Set(
-            transactions
-              .filter((t) => t.date)
-              .map((t) => {
-                const date = new Date(t.date!);
+    const transactionDayKeys = new Set(
+      transactions
+        .filter((t) => t.date)
+        .map((t) => {
+          const date = new Date(t.date!);
+          if (Number.isNaN(date.getTime())) return null;
+          return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+        })
+        .filter(Boolean)
+    );
 
-                return date
-                  .toISOString()
-                  .split('T')[0];
-              })
-          ).size
-        : 0;
+    const loggedDays = transactionDayKeys.size;
+    const zeroSpendDays = todayStatus === 'zero_spend' && !hasTransactionToday(transactions) ? 1 : 0;
 
     const dataConfidence = {
       confidence:
-        transactions.length > 0 ? 100 : 0,
+        transactions.length > 0 || todayStatus ? 100 : 0,
       loggedDays,
-      zeroSpendDays: 0,
+      zeroSpendDays,
       missingDays: 0,
     };
 
@@ -1024,7 +1082,7 @@ const runOutDays =
     ============================================================ */
 
     return (
-      <div className="space-y-6">
+      <div className="space-y-6 select-none">
 
         {/* ======================================================
             GREETING
@@ -1646,6 +1704,7 @@ const runOutDays =
               {categoryBreakdown.length > 0 ? (
 
                 <>
+                  <div className="select-none" style={{ userSelect: 'none' }}>
                   <ResponsiveContainer
                     width="100%"
                     height={160}
@@ -1662,6 +1721,9 @@ const runOutDays =
                         innerRadius={42}
                         outerRadius={68}
                         paddingAngle={2}
+                        minAngle={3}
+                        startAngle={90}
+                        endAngle={-270}
                       >
 
                         {categoryBreakdown.map(
@@ -1693,6 +1755,7 @@ const runOutDays =
                     </PieChart>
 
                   </ResponsiveContainer>
+                  </div>
 
                   <div className="space-y-1.5 mt-2">
 
@@ -1930,68 +1993,107 @@ const runOutDays =
 
               {todayStatus ? (
 
-                <div className="flex items-center gap-3 bg-emerald-400/[0.04] border border-emerald-400/10 rounded-xl p-3">
+                <div className="flex items-center justify-between gap-3 bg-emerald-400/[0.04] border border-emerald-400/10 rounded-xl p-3">
 
-                  <div className="w-8 h-8 rounded-full bg-emerald-400/10 flex items-center justify-center">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-emerald-400/10 flex items-center justify-center">
+                      <Check className="w-4 h-4 text-emerald-400" />
+                    </div>
 
-                    <Check className="w-4 h-4 text-emerald-400" />
-
+                    <div>
+                      <p className="text-sm text-emerald-300">
+                        {todayStatus === 'logged'
+                          ? "Today's finances are logged"
+                          : 'Zero spending confirmed'}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {todayStatus === 'logged'
+                          ? 'A transaction today automatically logs this day.'
+                          : 'You can undo this if you want to log activity later.'}
+                      </p>
+                    </div>
                   </div>
 
-                  <div>
-
-                    <p className="text-sm text-emerald-300">
-
-                      {todayStatus === 'logged'
-                        ? "Today's finances are logged"
-                        : 'Zero spending confirmed'}
-
-                    </p>
-
-                    <p className="text-xs text-gray-500">
-                      Thank you for tracking consistently
-                    </p>
-
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      try {
+                        localStorage.removeItem(
+                          todayTrackingKey(
+                            // The current user id is encoded in the loaded cache key.
+                            // Read it safely from the matching local-storage entry.
+                            currentUserId || ''
+                          )
+                        );
+                      } catch {
+                        // Ignore storage failures.
+                      }
+                      if (hasTransactionToday(transactions)) {
+                        setTodayStatus('logged');
+                      } else {
+                        setTodayStatus(null);
+                      }
+                    }}
+                    className="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-gray-500 hover:text-white transition-colors select-none"
+                    title="Undo today's manual confirmation"
+                  >
+                    <Undo2 className="w-3.5 h-3.5" />
+                    Undo
+                  </button>
 
                 </div>
 
               ) : (
 
                 <div className="space-y-3">
-
                   <p className="text-sm text-gray-400">
                     You haven't confirmed today's activity.
                   </p>
 
                   <div className="flex flex-col sm:flex-row gap-2">
-
                     <button
-                      onClick={() =>
-                        setTodayStatus(
-                          'logged'
-                        )
-                      }
-                      className="px-4 py-2 bg-emerald-400 text-[#050505] text-xs font-semibold rounded-lg hover:bg-emerald-300 transition-all"
+                      type="button"
+                      onClick={() => {
+                        setTodayStatus('logged');
+                        try {
+                          const key = currentUserId;
+                          if (key) {
+                            localStorage.setItem(
+                              todayTrackingKey(key),
+                              JSON.stringify({ status: 'logged', source: 'manual' })
+                            );
+                          }
+                        } catch {
+                          // Ignore storage failures.
+                        }
+                      }}
+                      className="px-4 py-2 bg-emerald-400 text-[#050505] text-xs font-semibold rounded-lg hover:bg-emerald-300 transition-all select-none"
                     >
                       I've logged today
                     </button>
 
                     <button
-                      onClick={() =>
-                        setTodayStatus(
-                          'zero_spend'
-                        )
-                      }
-                      className="px-4 py-2 glass text-gray-300 text-xs font-semibold rounded-lg hover:text-white transition-all"
+                      type="button"
+                      onClick={() => {
+                        setTodayStatus('zero_spend');
+                        try {
+                          const key = currentUserId;
+                          if (key) {
+                            localStorage.setItem(
+                              todayTrackingKey(key),
+                              JSON.stringify({ status: 'zero_spend', source: 'manual' })
+                            );
+                          }
+                        } catch {
+                          // Ignore storage failures.
+                        }
+                      }}
+                      className="px-4 py-2 glass text-gray-300 text-xs font-semibold rounded-lg hover:text-white transition-all select-none"
                     >
                       No spending today
                     </button>
-
                   </div>
-
                 </div>
-
               )}
 
             </div>
