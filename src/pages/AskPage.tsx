@@ -454,7 +454,9 @@ const response = await fetch(
             dailyAvailable
         ).toLocaleString(
           'en-IN'
-        )} above the amount currently available per day after accounting for fixed commitments and variable spending.`
+        )} above your current daily discretionary allowance of about ₹${Math.round(
+          dailyAvailable
+        ).toLocaleString('en-IN')}.`
       );
     }
 
@@ -742,7 +744,7 @@ const response = await fetch(
             </h1>
 
             <p className="text-sm text-gray-500 mt-0.5">
-              Evaluate a planned expense using your actual financial data
+              Get a personalized answer before you spend
             </p>
 
           </div>
@@ -1426,14 +1428,32 @@ function AnalysisResult({
               </>
             ) : (
               <>
+                <div className="flex items-center gap-2 mb-2">
+                  <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+                  <p className="text-[10px] uppercase tracking-[0.16em] text-emerald-400/80 font-semibold">
+                    AI Financial Coach
+                  </p>
+                </div>
+
                 {analysis.aiSummary && (
-                  <p className="text-sm font-semibold text-white leading-6 mb-2">
+                  <p className="text-sm font-semibold text-white leading-6 mb-3">
                     {analysis.aiSummary}
                   </p>
                 )}
-                <p className="text-sm text-gray-300 leading-6 whitespace-pre-line">
-                  {analysis.aiAdvice || analysis.message}
-                </p>
+
+                <div className="space-y-3">
+                  {(analysis.aiAdvice || analysis.message)
+                    .split(/\n\s*\n/)
+                    .filter(Boolean)
+                    .map((paragraph, index) => (
+                      <p
+                        key={index}
+                        className="text-sm text-gray-300 leading-6"
+                      >
+                        {paragraph}
+                      </p>
+                    ))}
+                </div>
               </>
             )}
 
