@@ -1171,8 +1171,19 @@ export function InsightsPage() {
                 userSelect: 'none',
                 WebkitUserSelect: 'none',
                 MozUserSelect: 'none',
+                WebkitUserDrag: 'none',
               }}
-              onMouseDown={(event) => event.preventDefault()}
+              onPointerDownCapture={(event) => {
+                event.preventDefault();
+                window.getSelection()?.removeAllRanges();
+              }}
+              onMouseDownCapture={(event) => {
+                event.preventDefault();
+                window.getSelection()?.removeAllRanges();
+              }}
+              onMouseMoveCapture={() => {
+                window.getSelection()?.removeAllRanges();
+              }}
               onDragStart={(event) => event.preventDefault()}
             >
               <style>{`
@@ -1181,6 +1192,17 @@ export function InsightsPage() {
                   user-select: none !important;
                   -webkit-user-select: none !important;
                   -moz-user-select: none !important;
+                  -webkit-user-drag: none !important;
+                }
+
+                .monthly-comparison-chart::selection,
+                .monthly-comparison-chart *::selection {
+                  background: transparent !important;
+                  color: inherit !important;
+                }
+
+                .monthly-comparison-chart svg {
+                  outline: none !important;
                 }
               `}</style>
               <ResponsiveContainer
