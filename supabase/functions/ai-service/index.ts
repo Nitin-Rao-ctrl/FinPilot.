@@ -1,4 +1,14 @@
-import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+// Supabase Edge Function runtime declarations.
+// Keeping these local declarations makes the file work in VS Code even when
+// the Deno extension is not enabled, while remaining compatible with Supabase Edge Runtime.
+declare const Deno: {
+  env: {
+    get(name: string): string | undefined;
+  };
+  serve(
+    handler: (req: Request) => Response | Promise<Response>
+  ): void;
+};
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -100,27 +110,41 @@ Treat fixed expenses as real cash-flow commitments, but keep all discretionary a
 FINANCIAL SNAPSHOT:
 ${JSON.stringify(snapshot, null, 2)}`;
     } else if (reportType === "spending-advice") {
-      systemPrompt = `You are a personal spending guidance assistant.
+      systemPrompt = `You are FinPilot's personal financial decision coach.
 
-Use ONLY the supplied financial context. Do not make up data.
+Your job is to reason through a user's planned purchase like a thoughtful human financial advisor, then explain the decision in plain, conversational language. The answer must feel specific to THIS user and THIS purchase, not like a generic budgeting template.
 
-IMPORTANT EXPENSE CLASSIFICATION RULES:
+Use ONLY the supplied financial facts. Never invent income, balances, transactions, goals, dates, or percentages. Use the exact numbers supplied when they are relevant.
 
-1. Fixed expenses such as rent, EMI, mess, loan payments and other unavoidable commitments are REAL expenses and affect actual available balance and cash flow.
+CORE FINANCIAL RULES:
+1. Fixed expenses such as rent, EMI, mess, loan payments and unavoidable commitments are REAL expenses. They reduce actual available cash and must be respected in the affordability decision.
+2. Fixed expenses are NOT discretionary spending. Never call them money leaks, waste, overspending, or bad habits merely because they are large.
+3. Variable expenses are the basis for spending behaviour, category pressure, discretionary burn rate and lifestyle recommendations.
+4. The proposed purchase itself is hypothetical. Do not treat it as an actual transaction.
 
-2. Fixed expenses are NOT discretionary spending and must not be treated as money leaks or evidence of poor spending behavior.
+HOW TO REASON:
+- Start with a clear verdict: whether the purchase looks comfortable, manageable with caution, or risky/not recommended.
+- Explain WHY using the user's actual balance and the balance after purchase.
+- Compare the purchase with the user's variable spending pattern and the amount available per day when that comparison is meaningful.
+- If the selected category is already a large variable-spending category, explain the pressure without exaggerating it.
+- If fixed commitments are the main reason cash is tight, explain that honestly instead of blaming discretionary spending.
+- Explain the trade-off: what the user gains from the purchase versus what financial flexibility they give up.
+- If it is affordable, do not manufacture a warning just to sound cautious.
+- If it is risky, suggest a concrete alternative such as delaying it, lowering the purchase amount, reducing a controllable category, or waiting until the next income cycle.
+- If data is incomplete, clearly say what is missing and avoid false certainty.
+- Do not give investment, loan, tax, or other regulated financial advice.
 
-3. Variable expenses are the basis for discretionary spending behavior, category behavior and unnecessary-spending analysis.
+WRITING STYLE:
+- Sound like ChatGPT having a useful conversation with the user, not like a dashboard label.
+- Use 3-5 short paragraphs for advice.
+- Mention concrete numbers naturally instead of dumping raw data.
+- Avoid repetitive phrases such as "based on the available information".
+- Do not simply restate the metrics shown on screen. Interpret them.
+- Give the user a practical next step.
 
-4. When evaluating a proposed purchase, consider the user's actual available balance after all real expenses, including fixed commitments.
-
-5. When discussing spending behavior, patterns or category pressure, use variable spending only.
-
-6. Do not recommend cutting unavoidable fixed commitments as if they were discretionary purchases.
-
-Explain the consequences of the proposed expense. Do not simply say yes or no. Consider remaining money, actual balance, budget, daily spending limit, variable spending patterns, goals, goal impact, and category behavior. If the purchase is manageable, say so. If it is risky, explain why and suggest realistic alternatives. The user remains responsible for the final decision.
-
-Respond as a JSON object with an "advice" field (2-4 paragraphs of natural language advice) and a "summary" field (one-line summary).`;
+Return JSON with exactly two fields:
+- advice: 3-5 short paragraphs of natural, personalized financial guidance.
+- summary: one concise sentence containing the overall verdict.`;
 
       prompt = `Provide spending advice based on this context.
 
@@ -133,6 +157,78 @@ ${JSON.stringify(spendingContext, null, 2)}`;
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    // The spending-decision experience uses the newer Responses API and a stronger
+    // model so the answer feels like an actual financial conversation instead of
+    // a short rule-based status message. Weekly reports keep the existing path.
+    if (reportType === "spending-advice") {
+      const response = await fetch("https://api.openai.com/v1/responses", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: "gpt-5.6-luna",
+          instructions: systemPrompt,
+          input: prompt,
+          max_output_tokens: 1400,
+          text: {
+            format: {
+              type: "json_schema",
+              name: "spending_advice",
+              strict: true,
+              schema: {
+                type: "object",
+                properties: {
+                  advice: { type: "string" },
+                  summary: { type: "string" },
+                },
+                required: ["advice", "summary"],
+                additionalProperties: false,
+              },
+            },
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        console.error("OpenAI Responses API error:", errText);
+
+        return new Response(
+          JSON.stringify({
+            error: `AI API returned ${response.status}`,
+            fallback: generateFallbackAdvice(spendingContext),
+          }),
+          {
+            status: 200,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+
+      const aiData = await response.json();
+      const content =
+        aiData.output_text ||
+        aiData.output
+          ?.flatMap((item: any) => item.content || [])
+          ?.find((item: any) => item.type === "output_text")?.text ||
+        "{}";
+
+      const parsed = JSON.parse(content);
+
+      return new Response(
+        JSON.stringify({
+          ...parsed,
+          modelUsed: "gpt-5.6-luna",
+        }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
     }
 
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -160,10 +256,7 @@ ${JSON.stringify(spendingContext, null, 2)}`;
       return new Response(
         JSON.stringify({
           error: `AI API returned ${response.status}`,
-          fallback:
-            reportType === "weekly"
-              ? generateFallbackReport(snapshot as FinancialSnapshot)
-              : generateFallbackAdvice(spendingContext),
+          fallback: generateFallbackReport(snapshot as FinancialSnapshot),
         }),
         {
           status: 200,
@@ -297,18 +390,44 @@ function generateFallbackReport(
 }
 
 function generateFallbackAdvice(
-  ctx: Record<string, unknown>
+  ctx: Record<string, any>
 ): { advice: string; summary: string } {
-  const decision = ctx?.decision || "CAUTION";
-  const reasons = (ctx?.reasons as string[]) || [];
+  const purchase = Number(ctx?.purchase?.amount || 0);
+  const balance = Number(ctx?.financialPosition?.currentBalance || 0);
+  const afterPurchase = Number(ctx?.financialPosition?.afterPurchase || 0);
+  const fixedExpense = Number(ctx?.financialPosition?.fixedExpense || 0);
+  const variableExpense = Number(ctx?.financialPosition?.variableExpense || 0);
+  const dailyAvailable = Number(ctx?.discretionaryAnalysis?.dailyAvailable || 0);
+  const category = String(ctx?.purchase?.category || 'this category');
+  const categoryPercentage = Number(
+    ctx?.discretionaryAnalysis?.categoryPercentage || 0
+  );
 
-  const advice = `Based on your financial context, this expense is classified as ${decision}. ${
-    reasons.length > 0
-      ? reasons.join(". ") + ". "
-      : ""
-  }Review your actual available balance and fixed commitments before making the purchase. For spending-behavior decisions, focus on your variable/discretionary spending rather than unavoidable fixed expenses.`;
+  const fmt = (value: number) =>
+    `₹${Math.round(value).toLocaleString('en-IN')}`;
 
-  const summary = `Classification: ${decision}`;
+  if (purchase > balance) {
+    return {
+      summary: `I would not recommend this purchase right now because it is larger than your available balance.`,
+      advice: `You currently have ${fmt(balance)} available, while this purchase costs ${fmt(purchase)}. Making the purchase would take you to ${fmt(afterPurchase)}, so it would put your current cash position under pressure.
 
-  return { advice, summary };
+You also have ${fmt(fixedExpense)} in fixed commitments and ${fmt(variableExpense)} in variable spending in the selected period. If the purchase is not urgent, delaying it until your next income cycle would be the safer option.`,
+    };
+  }
+
+  if (dailyAvailable > 0 && purchase > dailyAvailable) {
+    return {
+      summary: `You can afford the purchase, but it is large compared with your current daily discretionary amount.`,
+      advice: `You can technically afford ${fmt(purchase)} because your current balance is ${fmt(balance)} and you would have ${fmt(afterPurchase)} left afterward. The concern is that the purchase is larger than your current daily discretionary amount of about ${fmt(dailyAvailable)}.
+
+Because this is a ${category} purchase, it is worth checking whether that category is already under pressure. It currently represents about ${Math.round(categoryPercentage)}% of period income after including this purchase. If the purchase is important, consider delaying it or reducing the amount; otherwise, it looks manageable if you are comfortable giving up that much short-term flexibility.`,
+    };
+  }
+
+  return {
+    summary: `This purchase looks manageable without putting your current balance under immediate pressure.`,
+    advice: `You can afford ${fmt(purchase)} from your current balance of ${fmt(balance)}, leaving about ${fmt(afterPurchase)} afterward. That means the purchase does not immediately put your cash position at risk.
+
+You still have ${fmt(fixedExpense)} of fixed commitments and ${fmt(variableExpense)} of variable spending in the selected period, so the main question is whether this purchase is worth the reduction in financial flexibility. If it is a planned or important purchase, it looks reasonable; if it is optional, waiting could preserve more room for upcoming expenses.`,
+  };
 }

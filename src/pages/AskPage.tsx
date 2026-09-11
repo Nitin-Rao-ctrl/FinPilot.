@@ -10,10 +10,12 @@ import {
   CheckCircle2,
   Info,
   RefreshCw,
+  Sparkles,
 } from 'lucide-react';
 
 import { Reveal } from '@/lib/animations';
 import { supabase } from '@/lib/supabase';
+import { isFixedTransaction } from '@/lib/financial';
 import {
   MonthSelector,
   type SelectedPeriod,
@@ -35,14 +37,14 @@ type Category =
 type Transaction = {
   _id?: string;
   id?: string;
-  type?: string;
-  amount?: number | string;
+  type: 'income' | 'expense';
+  amount: number | string;
   category?: string;
   expenseType?: 'fixed' | 'variable' | string;
   isFixed?: boolean;
   description?: string;
   merchant?: string;
-  date?: string;
+  date: string;
 };
 
 type Analysis = {
@@ -61,6 +63,9 @@ type Analysis = {
     | 'NOT RECOMMENDED';
   message: string;
   warnings: string[];
+  aiAdvice?: string;
+  aiSummary?: string;
+  aiLoading?: boolean;
 };
 
 const API_URL = 'https://finpilot-backend-23iz.onrender.com';
@@ -80,17 +85,9 @@ const CATEGORIES: Category[] = [
 ];
 
 
-import {
-  isIncome,
-  isExpense,
-  isFixedTransaction,
-  isVariableTransaction,
-} from '@/lib/financial';
-
-
 function getCurrentBalance(
   transactions: Transaction[]
-): number {
+) {
   return transactions.reduce(
     (balance, transaction) => {
       const amount = Number(
@@ -101,15 +98,14 @@ function getCurrentBalance(
         return balance;
       }
 
-      if (isIncome(transaction)) {
+      if (
+        transaction.type ===
+        'income'
+      ) {
         return balance + amount;
       }
 
-      if (isExpense(transaction)) {
-        return balance - amount;
-      }
-
-      return balance;
+      return balance - amount;
     },
     0
   );
@@ -118,19 +114,21 @@ function getCurrentBalance(
 function getPeriodTransactions(
   transactions: Transaction[],
   period: SelectedPeriod
-): Transaction[] {
+) {
   if (period.type === 'all') {
     return transactions;
   }
 
   return transactions.filter((transaction) => {
-    if (!transaction.date) {
-      return false;
-    }
+    if (!transaction.date) return false;
 
     const date = new Date(transaction.date);
 
     if (Number.isNaN(date.getTime())) {
+      return false;
+    }
+
+    if (period.type !== 'month') {
       return false;
     }
 
@@ -144,16 +142,16 @@ function getPeriodTransactions(
 function getPeriodSpent(
   transactions: Transaction[],
   mode: 'all' | 'variable' = 'all'
-): number {
+) {
   return transactions.reduce(
     (total, transaction) => {
-      if (!isExpense(transaction)) {
+      if (transaction.type !== 'expense') {
         return total;
       }
 
       if (
         mode === 'variable' &&
-        !isVariableTransaction(transaction)
+        isFixedTransaction(transaction)
       ) {
         return total;
       }
@@ -174,11 +172,12 @@ function getPeriodSpent(
 function getCategorySpent(
   transactions: Transaction[],
   category: Category
-): number {
+) {
   return transactions.reduce(
     (total, transaction) => {
       if (
-        !isVariableTransaction(transaction) ||
+        transaction.type !== 'expense' ||
+        isFixedTransaction(transaction) ||
         (transaction.category || 'Other') !== category
       ) {
         return total;
@@ -290,10 +289,11 @@ const response = await fetch(
       const data =
         await response.json();
 
-      const normalizedTransactions: Transaction[] =
-        Array.isArray(data) ? data : [];
-
-      setTransactions(normalizedTransactions);
+      setTransactions(
+        Array.isArray(data)
+          ? data
+          : []
+      );
     } catch (error) {
       console.error(
         'Failed to load financial data:',
@@ -321,7 +321,7 @@ const response = await fetch(
     );
   }, [selectedPeriod]);
 
-  function handleAnalyze() {
+  async function handleAnalyze() {
     const purchaseAmount =
       Number(amount);
 
@@ -360,13 +360,10 @@ const response = await fetch(
       );
 
     const currentFixedSpent =
-      getPeriodSpent(
-        periodTransactions,
-        'all'
-      ) -
-      getPeriodSpent(
-        periodTransactions,
-        'variable'
+      Math.max(
+        0,
+        currentPeriodSpent -
+          currentVariableSpent
       );
 
     // Category analysis is discretionary only.
@@ -590,6 +587,72 @@ const response = await fetch(
         )} purchase appears manageable based on your selected period's income, variable spending and actual available balance.`;
     }
 
+    const variableCategoryTotals = periodTransactions.reduce<Record<string, number>>(
+      (totals, transaction) => {
+        if (
+          transaction.type !== 'expense' ||
+          isFixedTransaction(transaction)
+        ) {
+          return totals;
+        }
+
+        const value = Number(transaction.amount || 0);
+        if (!Number.isFinite(value)) return totals;
+
+        const key = transaction.category || 'Other';
+        totals[key] = (totals[key] || 0) + value;
+        return totals;
+      },
+      {}
+    );
+
+    const topVariableCategories = Object.entries(variableCategoryTotals)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([name, total]) => ({ name, total }));
+
+    const periodLabel =
+      selectedPeriod.type === 'month'
+        ? new Date(
+            selectedPeriod.year,
+            selectedPeriod.month,
+            1
+          ).toLocaleDateString('en-IN', {
+            month: 'long',
+            year: 'numeric',
+          })
+        : 'all recorded transactions';
+
+    const spendingContext = {
+      purchase: {
+        amount: purchaseAmount,
+        category,
+        description: description.trim() || 'No description provided',
+      },
+      period: periodLabel,
+      financialPosition: {
+        currentBalance,
+        afterPurchase,
+        periodIncome,
+        actualPeriodExpense: currentPeriodSpent,
+        fixedExpense: currentFixedSpent,
+        variableExpense: currentVariableSpent,
+        savingsAfterPurchase,
+      },
+      discretionaryAnalysis: {
+        dailyAvailable,
+        categorySpent,
+        categoryPercentage,
+        topVariableCategories,
+      },
+      deterministicAssessment: {
+        status,
+        goalImpact,
+        warnings,
+      },
+      transactionCount: periodTransactions.length,
+    };
+
     setAnalysis({
       currentBalance,
       afterPurchase,
@@ -605,7 +668,53 @@ const response = await fetch(
       status,
       message,
       warnings,
+      aiLoading: true,
     });
+
+    try {
+      const { data, error } = await supabase.functions.invoke(
+        'ai-service',
+        {
+          body: {
+            reportType: 'spending-advice',
+            spendingContext,
+          },
+        }
+      );
+
+      if (error) throw error;
+
+      const aiResult = data?.fallback || data || {};
+      const aiAdvice =
+        typeof aiResult.advice === 'string'
+          ? aiResult.advice
+          : '';
+      const aiSummary =
+        typeof aiResult.summary === 'string'
+          ? aiResult.summary
+          : '';
+
+      setAnalysis((previous) =>
+        previous
+          ? {
+              ...previous,
+              aiAdvice: aiAdvice || previous.message,
+              aiSummary,
+              aiLoading: false,
+            }
+          : previous
+      );
+    } catch (error) {
+      console.error('AI spending advice failed:', error);
+      setAnalysis((previous) =>
+        previous
+          ? {
+              ...previous,
+              aiLoading: false,
+            }
+          : previous
+      );
+    }
   }
 
   function handleReset() {
@@ -756,7 +865,7 @@ const response = await fetch(
               )
                 .filter(
                   (transaction) =>
-                    isIncome(transaction)
+                    transaction.type === 'income'
                 )
                 .reduce(
                   (sum, transaction) =>
@@ -1055,11 +1164,6 @@ const response = await fetch(
               Financial Impact Breakdown
             </p>
 
-            <p className="text-[10px] text-gray-600 mb-4">
-              Fixed commitments affect your real balance and cash flow,
-              but discretionary category analysis uses variable spending only.
-            </p>
-
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
 
               <MetricBox
@@ -1307,9 +1411,31 @@ function AnalysisResult({
 
           <div>
 
-            <p className="text-sm text-gray-300 leading-relaxed">
-              {analysis.message}
-            </p>
+            {analysis.aiLoading ? (
+              <>
+                <div className="flex items-center gap-2 mb-2">
+                  <Sparkles className="w-4 h-4 text-emerald-400" />
+                  <p className="text-sm font-medium text-white">
+                    FinPilot is thinking through this purchase...
+                  </p>
+                  <RefreshCw className="w-3.5 h-3.5 text-emerald-400 animate-spin" />
+                </div>
+                <p className="text-sm text-gray-400 leading-6">
+                  Comparing your actual balance, fixed commitments, variable spending pattern and the impact of this purchase.
+                </p>
+              </>
+            ) : (
+              <>
+                {analysis.aiSummary && (
+                  <p className="text-sm font-semibold text-white leading-6 mb-2">
+                    {analysis.aiSummary}
+                  </p>
+                )}
+                <p className="text-sm text-gray-300 leading-6 whitespace-pre-line">
+                  {analysis.aiAdvice || analysis.message}
+                </p>
+              </>
+            )}
 
             {description && (
               <p className="text-xs text-gray-600 mt-3">
