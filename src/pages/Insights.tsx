@@ -1166,45 +1166,9 @@ export function InsightsPage() {
             </div>
           ) : (
             <div
-              className="monthly-comparison-chart select-none"
-              style={{
-                userSelect: 'none',
-                WebkitUserSelect: 'none',
-                MozUserSelect: 'none',
-                WebkitUserDrag: 'none',
-              }}
-              onPointerDownCapture={(event) => {
-                event.preventDefault();
-                window.getSelection()?.removeAllRanges();
-              }}
-              onMouseDownCapture={(event) => {
-                event.preventDefault();
-                window.getSelection()?.removeAllRanges();
-              }}
-              onMouseMoveCapture={() => {
-                window.getSelection()?.removeAllRanges();
-              }}
-              onDragStart={(event) => event.preventDefault()}
+              className="monthly-comparison-chart"
+              style={{ userSelect: 'none' }}
             >
-              <style>{`
-                .monthly-comparison-chart,
-                .monthly-comparison-chart * {
-                  user-select: none !important;
-                  -webkit-user-select: none !important;
-                  -moz-user-select: none !important;
-                  -webkit-user-drag: none !important;
-                }
-
-                .monthly-comparison-chart::selection,
-                .monthly-comparison-chart *::selection {
-                  background: transparent !important;
-                  color: inherit !important;
-                }
-
-                .monthly-comparison-chart svg {
-                  outline: none !important;
-                }
-              `}</style>
               <ResponsiveContainer
                 width="100%"
                 height={220}
@@ -1237,6 +1201,7 @@ export function InsightsPage() {
                 />
 
                 <Tooltip
+                  cursor={false}
                   contentStyle={{
                     background: '#0C0F0D',
                     border:
