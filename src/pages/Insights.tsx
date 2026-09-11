@@ -1166,13 +1166,23 @@ export function InsightsPage() {
             </div>
           ) : (
             <div
-              className="select-none"
+              className="monthly-comparison-chart select-none"
               style={{
                 userSelect: 'none',
                 WebkitUserSelect: 'none',
+                MozUserSelect: 'none',
               }}
               onMouseDown={(event) => event.preventDefault()}
+              onDragStart={(event) => event.preventDefault()}
             >
+              <style>{`
+                .monthly-comparison-chart,
+                .monthly-comparison-chart * {
+                  user-select: none !important;
+                  -webkit-user-select: none !important;
+                  -moz-user-select: none !important;
+                }
+              `}</style>
               <ResponsiveContainer
                 width="100%"
                 height={220}
