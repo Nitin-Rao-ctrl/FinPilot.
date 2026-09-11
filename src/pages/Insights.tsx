@@ -59,10 +59,11 @@ const CATEGORY_HUES = [
 ];
 
 function getCategoryColor(category: string): string {
+  const safeCategory = String(category || 'Other');
   let hash = 0;
 
-  for (let index = 0; index < category.length; index += 1) {
-    hash = (hash * 31 + category.charCodeAt(index)) >>> 0;
+  for (let index = 0; index < safeCategory.length; index += 1) {
+    hash = (hash * 31 + safeCategory.charCodeAt(index)) >>> 0;
   }
 
   const hue = CATEGORY_HUES[hash % CATEGORY_HUES.length];
@@ -1335,19 +1336,20 @@ export function InsightsPage() {
               <PieChart>
 
                 <Pie
-                  data={categoryBreakdown}
-                  dataKey="percentage"
+                  data={categoryBreakdown.filter((item) => Number(item.total) > 0)}
+                  dataKey="total"
                   nameKey="category"
                   cx="50%"
                   cy="50%"
                   innerRadius={60}
                   outerRadius={95}
                   paddingAngle={3}
+                  isAnimationActive={false}
                 >
-                  {categoryBreakdown.map(
-                    (_, index) => (
+                  {categoryBreakdown.filter((item) => Number(item.total) > 0).map(
+                    (category, index) => (
                       <Cell
-                        key={index}
+                        key={category.category || index}
                         fill={getCategoryColor(
                           category.category
                         )}
@@ -1357,6 +1359,7 @@ export function InsightsPage() {
                 </Pie>
 
                 <Tooltip
+                  cursor={false}
                   contentStyle={{
                     background: '#0C0F0D',
                     border:
