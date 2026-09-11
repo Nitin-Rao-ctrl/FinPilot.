@@ -36,14 +36,38 @@ import {
   type SelectedPeriod,
 } from '@/components/MonthSelector';
 
-const PIE_COLORS = [
-  '#00FF88',
-  '#00D97E',
-  '#10B981',
-  '#059669',
-  '#047857',
-  '#065F46',
+// Stable, high-contrast colors for categories. The color is derived from
+// the category name, so the same category keeps the same color even when
+// sorting/order changes or new transactions are added.
+const CATEGORY_HUES = [
+  156, // emerald
+  205, // blue
+  270, // purple
+  32,  // orange
+  335, // pink
+  190, // cyan
+  48,  // yellow
+  115, // lime
+  12,  // red-orange
+  285, // violet
+  175, // teal
+  225, // indigo
+  70,  // yellow-green
+  355, // red
+  250, // blue-violet
+  95,  // green
 ];
+
+function getCategoryColor(category: string): string {
+  let hash = 0;
+
+  for (let index = 0; index < category.length; index += 1) {
+    hash = (hash * 31 + category.charCodeAt(index)) >>> 0;
+  }
+
+  const hue = CATEGORY_HUES[hash % CATEGORY_HUES.length];
+  return `hsl(${hue} 78% 56%)`;
+}
 
 type Transaction = {
   _id?: string;
@@ -1324,12 +1348,9 @@ export function InsightsPage() {
                     (_, index) => (
                       <Cell
                         key={index}
-                        fill={
-                          PIE_COLORS[
-                            index %
-                              PIE_COLORS.length
-                          ]
-                        }
+                        fill={getCategoryColor(
+                          category.category
+                        )}
                       />
                     )
                   )}
@@ -1366,10 +1387,9 @@ export function InsightsPage() {
                           className="w-2.5 h-2.5 rounded-full"
                           style={{
                             background:
-                              PIE_COLORS[
-                                index %
-                                  PIE_COLORS.length
-                              ],
+                              getCategoryColor(
+                                category.category
+                              ),
                           }}
                         />
 
@@ -1403,10 +1423,9 @@ export function InsightsPage() {
                         style={{
                           width: `${category.percentage}%`,
                           background:
-                            PIE_COLORS[
-                              index %
-                                PIE_COLORS.length
-                            ],
+                            getCategoryColor(
+                              category.category
+                            ),
                         }}
                       />
 
