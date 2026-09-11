@@ -1165,14 +1165,23 @@ export function InsightsPage() {
               </p>
             </div>
           ) : (
-            <ResponsiveContainer
-              width="100%"
-              height={220}
+            <div
+              className="select-none"
+              style={{
+                userSelect: 'none',
+                WebkitUserSelect: 'none',
+              }}
+              onMouseDown={(event) => event.preventDefault()}
             >
-              <BarChart
-                data={monthlyComparison}
-                barGap={8}
+              <ResponsiveContainer
+                width="100%"
+                height={220}
               >
+                <BarChart
+                  data={monthlyComparison}
+                  barGap={8}
+                  style={{ userSelect: 'none' }}
+                >
 
                 <CartesianGrid
                   strokeDasharray="3 3"
@@ -1205,31 +1214,40 @@ export function InsightsPage() {
                   }}
                 />
 
-                <Bar
-                  dataKey="income"
-                  fill="#00FF88"
-                  radius={[
-                    4,
-                    4,
-                    0,
-                    0,
-                  ]}
-                  opacity={0.4}
-                />
+                  <Bar
+                    dataKey="income"
+                    fill="#00FF88"
+                    radius={[
+                      4,
+                      4,
+                      0,
+                      0,
+                    ]}
+                    opacity={0.4}
+                    activeBar={{
+                      fill: '#00FF88',
+                      opacity: 0.75,
+                    }}
+                  />
 
-                <Bar
-                  dataKey="expense"
-                  fill="#00D97E"
-                  radius={[
-                    4,
-                    4,
-                    0,
-                    0,
-                  ]}
-                />
+                  <Bar
+                    dataKey="expense"
+                    fill="#00D97E"
+                    radius={[
+                      4,
+                      4,
+                      0,
+                      0,
+                    ]}
+                    activeBar={{
+                      fill: '#00FF88',
+                      opacity: 1,
+                    }}
+                  />
 
-              </BarChart>
-            </ResponsiveContainer>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           )}
 
           <p className="text-[10px] text-gray-600 mt-2">
