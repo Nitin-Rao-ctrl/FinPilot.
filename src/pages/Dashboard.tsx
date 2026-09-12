@@ -9,7 +9,6 @@
     FileText,
     Calendar,
     Check,
-    Undo2,
   } from 'lucide-react';
 
   import {
@@ -32,20 +31,6 @@
   import { CountUp, Reveal } from '@/lib/animations';
   import { supabase } from '@/lib/supabase';
   import type { SelectedPeriod } from '@/components/MonthSelector';
-  import {
-  isExpense,
-  isIncome,
-  isFixedTransaction,
-  isVariableTransaction,
-  calculateActualBalance,
-  calculateTotalExpenses,
-  calculateFixedExpenses,
-  calculateVariableExpenses,
-  calculateAverageDailyVariableSpend,
-  calculateProjectedVariableSpend,
-  calculateProjectedMonthEndBalance,
-  calculateRunOutDays,
-} from '@/lib/financial';
 
   const PIE_COLORS = [
     '#00FF88',
@@ -62,7 +47,6 @@
   type?: string;
   category?: string;
   expenseType?: 'fixed' | 'variable';
-  isFixed?: boolean;
   date?: string;
   description?: string;
 };
@@ -73,82 +57,14 @@
     detail: string;
   };
 
-/* ============================================================
-   FIXED EXPENSE HELPERS
-
-   A transaction is Fixed when either:
-   - expenseType === 'fixed'
-   - isFixed === true
-
-   Fixed expenses are REAL cash-flow expenses, but they are
-   NEVER part of the variable daily burn-rate calculations.
-   ============================================================ */
-
-
-
   export function DashboardPage() {
     const [todayStatus, setTodayStatus] = useState<
       'logged' | 'zero_spend' | null
     >(null);
 
-    const getTodayKey = () => {
-      const now = new Date();
-      return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-    };
-
-    const todayTrackingKey = (userId: string) =>
-      `finpilot_today_tracking_${userId}_${getTodayKey()}`;
-
-    const hasTransactionToday = (list: Transaction[]) => {
-      const now = new Date();
-      return list.some((t) => {
-        if (!t.date) return false;
-        const date = new Date(t.date);
-        if (Number.isNaN(date.getTime())) return false;
-        return (
-          date.getDate() === now.getDate() &&
-          date.getMonth() === now.getMonth() &&
-          date.getFullYear() === now.getFullYear()
-        );
-      });
-    };
-
-    const syncTodayStatus = (list: Transaction[], userId: string) => {
-      // A transaction added for today is the strongest signal: the day is
-      // automatically considered logged, so the user is never asked again.
-      if (hasTransactionToday(list)) {
-        setTodayStatus('logged');
-        try {
-          localStorage.setItem(
-            todayTrackingKey(userId),
-            JSON.stringify({ status: 'logged', source: 'transaction' })
-          );
-        } catch {
-          // Ignore storage failures. The transaction itself remains the source of truth.
-        }
-        return;
-      }
-
-      try {
-        const saved = localStorage.getItem(todayTrackingKey(userId));
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (parsed?.status === 'logged' || parsed?.status === 'zero_spend') {
-            setTodayStatus(parsed.status);
-            return;
-          }
-        }
-      } catch {
-        // Ignore invalid saved tracking state.
-      }
-
-      setTodayStatus(null);
-    };
-
     const [transactions, setTransactions] = useState<Transaction[]>([]);
 const [loading, setLoading] = useState(true);
 const [userName, setUserName] = useState('User');
-const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
 const [selectedPeriod] =
   useState<SelectedPeriod>(() => {
@@ -194,80 +110,23 @@ const [selectedPeriod] =
       LOAD TRANSACTIONS
     ============================================================ */
 useEffect(() => {
-  let cancelled = false;
-
   async function loadTransactions() {
-    let userId: string | null = null;
-    let cacheKey = '';
-
     try {
-      /*
-       * getSession() restores the already-persisted Supabase session
-       * locally. Do not use getUser() here because that can trigger an
-       * additional Auth network request on every dashboard mount.
-       */
+      setLoading(true);
+
       const {
-        data: { session },
-        error: sessionError,
-      } = await supabase.auth.getSession();
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
 
-      if (sessionError || !session?.user) {
-        throw new Error('User session is unavailable');
+      if (userError || !user) {
+        throw new Error('User is not logged in');
       }
-
-      if (cancelled) return;
-
-      const user = session.user;
-      userId = user.id;
-      setCurrentUserId(user.id);
-      cacheKey = `finpilot_transactions_${userId}`;
-
-      const name =
-        user.user_metadata?.full_name ||
-        user.user_metadata?.name ||
-        user.user_metadata?.user_name ||
-        user.email?.split('@')[0] ||
-        'User';
-
-      setUserName(name);
-
-      /*
-       * STALE-WHILE-REVALIDATE:
-       * Show the last successful transaction snapshot immediately so the
-       * Dashboard does not sit at ₹0 while Render/MongoDB wakes up.
-       * The fresh API response replaces this data in the background.
-       */
-      try {
-        const cached = localStorage.getItem(cacheKey);
-
-        if (cached) {
-          const parsed = JSON.parse(cached);
-
-          if (Array.isArray(parsed)) {
-            setTransactions(parsed);
-            syncTodayStatus(parsed, userId);
-            setLoading(false);
-          }
-        }
-      } catch (cacheError) {
-        console.warn(
-          'Unable to restore cached dashboard transactions:',
-          cacheError
-        );
-      }
-
-      if (cancelled) return;
-
 
       const response = await fetch(
         `https://finpilot-backend-23iz.onrender.com/api/transactions?userId=${encodeURIComponent(
-          userId
-        )}`,
-        {
-          headers: {
-            Accept: 'application/json',
-          },
-        }
+          user.id
+        )}`
       );
 
       if (!response.ok) {
@@ -277,48 +136,49 @@ useEffect(() => {
       }
 
       const data = await response.json();
-      const freshTransactions = Array.isArray(data) ? data : [];
 
-      if (cancelled) return;
-
-      setTransactions(freshTransactions);
-      syncTodayStatus(freshTransactions, userId);
-
-      try {
-        localStorage.setItem(
-          cacheKey,
-          JSON.stringify(freshTransactions)
-        );
-      } catch (cacheError) {
-        console.warn(
-          'Unable to cache dashboard transactions:',
-          cacheError
-        );
-      }
+      setTransactions(
+        Array.isArray(data) ? data : []
+      );
     } catch (error) {
       console.error(
         'Error loading dashboard transactions:',
         error
       );
 
-      // Never erase a valid cached snapshot just because the backend
-      // is waking up or temporarily unavailable.
-      if (!cancelled && !userId) {
-        setTransactions([]);
-      }
+      setTransactions([]);
     } finally {
-      if (!cancelled) {
-        setLoading(false);
-      }
+      setLoading(false);
     }
   }
 
   loadTransactions();
-
-  return () => {
-    cancelled = true;
-  };
 }, []);
+
+    /* ============================================================
+      LOAD LOGGED-IN USER
+    ============================================================ */
+
+    useEffect(() => {
+      async function loadUserName() {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+
+        if (!user) return;
+
+        const name =
+          user.user_metadata?.full_name ||
+          user.user_metadata?.name ||
+          user.user_metadata?.user_name ||
+          user.email?.split('@')[0] ||
+          'User';
+
+        setUserName(name);
+      }
+
+      loadUserName();
+    }, []);
 
     /* ============================================================
       BASIC TOTALS
@@ -351,7 +211,7 @@ const selectedTransactions =
 ============================================================ */
 
 const totalIncome = selectedTransactions
-  .filter(isIncome)
+  .filter((t) => t.type === 'income')
   .reduce(
     (sum, t) =>
       sum + Number(t.amount || 0),
@@ -361,7 +221,8 @@ const totalIncome = selectedTransactions
 const totalFixedExpense = selectedTransactions
   .filter(
     (t) =>
-      isFixedTransaction(t)
+      t.type === 'expense' &&
+      t.expenseType === 'fixed'
   )
   .reduce(
     (sum, t) =>
@@ -372,7 +233,8 @@ const totalFixedExpense = selectedTransactions
 const totalVariableExpense = selectedTransactions
   .filter(
     (t) =>
-      isVariableTransaction(t)
+      t.type === 'expense' &&
+      t.expenseType !== 'fixed'
   )
   .reduce(
     (sum, t) =>
@@ -380,13 +242,14 @@ const totalVariableExpense = selectedTransactions
     0
   );
 
-const totalExpense =
-  calculateTotalExpenses(
-    selectedTransactions
+const totalExpense = selectedTransactions
+  .filter((t) => t.type === 'expense')
+  .reduce(
+    (sum, t) =>
+      sum + Number(t.amount || 0),
+    0
   );
 
-    // Actual cash balance includes ALL real expenses.
-    // Fixed expenses therefore reduce available income here.
     const balance = totalIncome - totalExpense;
 
     const savings = balance;
@@ -439,9 +302,13 @@ const totalExpense =
         );
 
     const currentMonthExpense =
-      calculateTotalExpenses(
-        currentMonthTransactions
-      );
+      currentMonthTransactions
+        .filter((t) => t.type === 'expense')
+        .reduce(
+          (sum, t) =>
+            sum + Number(t.amount || 0),
+          0
+        );
 
     const currentMonthBalance =
       currentMonthIncome - currentMonthExpense;
@@ -455,14 +322,16 @@ const totalExpense =
 const variableExpenseTransactions =
   currentMonthTransactions.filter(
     (t) =>
-      isVariableTransaction(t) &&
+      t.type === 'expense' &&
+      t.expenseType !== 'fixed' &&
       Number(t.amount || 0) > 0
   );
 
 const fixedExpenseTransactions =
   currentMonthTransactions.filter(
     (t) =>
-      isFixedTransaction(t) &&
+      t.type === 'expense' &&
+      t.expenseType === 'fixed' &&
       Number(t.amount || 0) > 0
   );
 
@@ -489,7 +358,8 @@ const currentMonthFixedExpense =
     selectedTransactions
       .filter(
         (t) =>
-          isVariableTransaction(t)
+          t.type === 'expense' &&
+          t.expenseType !== 'fixed'
       )
       .forEach((t) => {
         const category =
@@ -523,7 +393,8 @@ const currentMonthFixedExpense =
     selectedTransactions
       .filter(
         (t) =>
-          isVariableTransaction(t)
+          t.type === 'expense' &&
+          t.expenseType !== 'fixed'
       )
       .forEach((t) => {
         if (!t.date) return;
@@ -562,7 +433,8 @@ const currentMonthFixedExpense =
 
     const todayExpenses = transactions.filter(
       (t) => {
-        if (!isVariableTransaction(t)) return false;
+        if (t.type !== 'expense') return false;
+        if (t.expenseType === 'fixed') return false;
         if (!t.date) return false;
 
         const date = new Date(t.date);
@@ -692,7 +564,8 @@ const currentMonthFixedExpense =
 
 const expenseTransactions = selectedTransactions.filter(
   (t) =>
-    isVariableTransaction(t) &&
+    t.type === 'expense' &&
+    t.expenseType !== 'fixed' &&
     Number(t.amount || 0) > 0
 );
 
@@ -959,25 +832,26 @@ if (expenseTransactions.length > 0) {
       DATA CONFIDENCE
     ============================================================ */
 
-    const transactionDayKeys = new Set(
-      transactions
-        .filter((t) => t.date)
-        .map((t) => {
-          const date = new Date(t.date!);
-          if (Number.isNaN(date.getTime())) return null;
-          return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-        })
-        .filter(Boolean)
-    );
+    const loggedDays =
+      transactions.length > 0
+        ? new Set(
+            transactions
+              .filter((t) => t.date)
+              .map((t) => {
+                const date = new Date(t.date!);
 
-    const loggedDays = transactionDayKeys.size;
-    const zeroSpendDays = todayStatus === 'zero_spend' && !hasTransactionToday(transactions) ? 1 : 0;
+                return date
+                  .toISOString()
+                  .split('T')[0];
+              })
+          ).size
+        : 0;
 
     const dataConfidence = {
       confidence:
-        transactions.length > 0 || todayStatus ? 100 : 0,
+        transactions.length > 0 ? 100 : 0,
       loggedDays,
-      zeroSpendDays,
+      zeroSpendDays: 0,
       missingDays: 0,
     };
 
@@ -1062,10 +936,10 @@ const forecastMessage =
   NOT ₹8,200.
 */
 const averageDailyVariableSpend =
-      calculateAverageDailyVariableSpend(
-        currentMonthTransactions,
-        daysElapsed
-      );
+  daysElapsed > 0
+    ? currentMonthVariableExpense /
+      daysElapsed
+    : 0;
 
 /*
   Run-out is based on discretionary/variable
@@ -1073,16 +947,20 @@ const averageDailyVariableSpend =
   fixed commitments.
 */
 const runOutDays =
-      calculateRunOutDays(
-        currentMonthTransactions,
-        daysElapsed
-      );
+  averageDailyVariableSpend > 0 &&
+  currentMonthBalance > 0
+    ? Math.round(
+        (currentMonthBalance /
+          averageDailyVariableSpend) *
+          10
+      ) / 10
+    : 0;
     /* ============================================================
       RENDER
     ============================================================ */
 
     return (
-      <div className="space-y-6 select-none">
+      <div className="space-y-6">
 
         {/* ======================================================
             GREETING
@@ -1704,7 +1582,6 @@ const runOutDays =
               {categoryBreakdown.length > 0 ? (
 
                 <>
-                  <div className="select-none" style={{ userSelect: 'none' }}>
                   <ResponsiveContainer
                     width="100%"
                     height={160}
@@ -1721,9 +1598,6 @@ const runOutDays =
                         innerRadius={42}
                         outerRadius={68}
                         paddingAngle={2}
-                        minAngle={3}
-                        startAngle={90}
-                        endAngle={-270}
                       >
 
                         {categoryBreakdown.map(
@@ -1755,7 +1629,6 @@ const runOutDays =
                     </PieChart>
 
                   </ResponsiveContainer>
-                  </div>
 
                   <div className="space-y-1.5 mt-2">
 
@@ -1993,107 +1866,68 @@ const runOutDays =
 
               {todayStatus ? (
 
-                <div className="flex items-center justify-between gap-3 bg-emerald-400/[0.04] border border-emerald-400/10 rounded-xl p-3">
+                <div className="flex items-center gap-3 bg-emerald-400/[0.04] border border-emerald-400/10 rounded-xl p-3">
 
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-emerald-400/10 flex items-center justify-center">
-                      <Check className="w-4 h-4 text-emerald-400" />
-                    </div>
+                  <div className="w-8 h-8 rounded-full bg-emerald-400/10 flex items-center justify-center">
 
-                    <div>
-                      <p className="text-sm text-emerald-300">
-                        {todayStatus === 'logged'
-                          ? "Today's finances are logged"
-                          : 'Zero spending confirmed'}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        {todayStatus === 'logged'
-                          ? 'A transaction today automatically logs this day.'
-                          : 'You can undo this if you want to log activity later.'}
-                      </p>
-                    </div>
+                    <Check className="w-4 h-4 text-emerald-400" />
+
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => {
-                      try {
-                        localStorage.removeItem(
-                          todayTrackingKey(
-                            // The current user id is encoded in the loaded cache key.
-                            // Read it safely from the matching local-storage entry.
-                            currentUserId || ''
-                          )
-                        );
-                      } catch {
-                        // Ignore storage failures.
-                      }
-                      if (hasTransactionToday(transactions)) {
-                        setTodayStatus('logged');
-                      } else {
-                        setTodayStatus(null);
-                      }
-                    }}
-                    className="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-gray-500 hover:text-white transition-colors select-none"
-                    title="Undo today's manual confirmation"
-                  >
-                    <Undo2 className="w-3.5 h-3.5" />
-                    Undo
-                  </button>
+                  <div>
+
+                    <p className="text-sm text-emerald-300">
+
+                      {todayStatus === 'logged'
+                        ? "Today's finances are logged"
+                        : 'Zero spending confirmed'}
+
+                    </p>
+
+                    <p className="text-xs text-gray-500">
+                      Thank you for tracking consistently
+                    </p>
+
+                  </div>
 
                 </div>
 
               ) : (
 
                 <div className="space-y-3">
+
                   <p className="text-sm text-gray-400">
                     You haven't confirmed today's activity.
                   </p>
 
                   <div className="flex flex-col sm:flex-row gap-2">
+
                     <button
-                      type="button"
-                      onClick={() => {
-                        setTodayStatus('logged');
-                        try {
-                          const key = currentUserId;
-                          if (key) {
-                            localStorage.setItem(
-                              todayTrackingKey(key),
-                              JSON.stringify({ status: 'logged', source: 'manual' })
-                            );
-                          }
-                        } catch {
-                          // Ignore storage failures.
-                        }
-                      }}
-                      className="px-4 py-2 bg-emerald-400 text-[#050505] text-xs font-semibold rounded-lg hover:bg-emerald-300 transition-all select-none"
+                      onClick={() =>
+                        setTodayStatus(
+                          'logged'
+                        )
+                      }
+                      className="px-4 py-2 bg-emerald-400 text-[#050505] text-xs font-semibold rounded-lg hover:bg-emerald-300 transition-all"
                     >
                       I've logged today
                     </button>
 
                     <button
-                      type="button"
-                      onClick={() => {
-                        setTodayStatus('zero_spend');
-                        try {
-                          const key = currentUserId;
-                          if (key) {
-                            localStorage.setItem(
-                              todayTrackingKey(key),
-                              JSON.stringify({ status: 'zero_spend', source: 'manual' })
-                            );
-                          }
-                        } catch {
-                          // Ignore storage failures.
-                        }
-                      }}
-                      className="px-4 py-2 glass text-gray-300 text-xs font-semibold rounded-lg hover:text-white transition-all select-none"
+                      onClick={() =>
+                        setTodayStatus(
+                          'zero_spend'
+                        )
+                      }
+                      className="px-4 py-2 glass text-gray-300 text-xs font-semibold rounded-lg hover:text-white transition-all"
                     >
                       No spending today
                     </button>
+
                   </div>
+
                 </div>
+
               )}
 
             </div>
@@ -2321,4 +2155,3 @@ const runOutDays =
       </div>
     );
   }
-  

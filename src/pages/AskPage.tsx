@@ -392,7 +392,16 @@ const response = await fetch(
       currentBalance -
       purchaseAmount;
 
-    const daysInPeriod =
+    // Keep Should I Spend? consistent with the Dashboard.
+    // Daily limit = money still available after fixed + variable spending,
+    // spread across the remaining days of the selected current month.
+    const now = new Date();
+    const isCurrentMonth =
+      selectedPeriod.type === 'month' &&
+      selectedPeriod.year === now.getFullYear() &&
+      selectedPeriod.month === now.getMonth();
+
+    const daysInSelectedMonth =
       selectedPeriod.type === 'month'
         ? new Date(
             selectedPeriod.year,
@@ -401,14 +410,22 @@ const response = await fetch(
           ).getDate()
         : 30;
 
+    const daysRemaining = isCurrentMonth
+      ? Math.max(1, daysInSelectedMonth - now.getDate())
+      : daysInSelectedMonth;
+
+    const remainingVariableBudget = Math.max(
+      0,
+      periodIncome - currentFixedSpent - currentVariableSpent
+    );
+
     const dailyAvailable =
       periodIncome > 0
         ? Math.max(
             0,
-            (periodIncome -
-              currentFixedSpent -
-              currentVariableSpent) /
-              Math.max(1, daysInPeriod)
+            Math.round(
+              remainingVariableBudget / daysRemaining
+            )
           )
         : 0;
 
@@ -454,7 +471,9 @@ const response = await fetch(
             dailyAvailable
         ).toLocaleString(
           'en-IN'
-        )} above the amount currently available per day after accounting for fixed commitments and variable spending.`
+        )} above your current daily discretionary allowance of about ₹${Math.round(
+          dailyAvailable
+        ).toLocaleString('en-IN')}.`
       );
     }
 
@@ -628,7 +647,6 @@ const response = await fetch(
         amount: purchaseAmount,
         category,
         description: description.trim() || 'No description provided',
-        userIntent: description.trim() || 'No purchase reason provided',
       },
       period: periodLabel,
       financialPosition: {
@@ -743,7 +761,7 @@ const response = await fetch(
             </h1>
 
             <p className="text-sm text-gray-500 mt-0.5">
-              Evaluate a planned expense using your actual financial data
+              Get a personalized answer before you spend
             </p>
 
           </div>
@@ -1054,7 +1072,7 @@ const response = await fetch(
               <div className="mb-5">
 
                 <label className="block text-xs uppercase tracking-wider text-gray-500 font-medium mb-2">
-                  Purpose / Description
+                  Description
                 </label>
 
                 <input
@@ -1070,7 +1088,7 @@ const response = await fetch(
                       null
                     );
                   }}
-                  placeholder="What are you buying and why?"
+                  placeholder="What are you planning to buy?"
                   className="form-input w-full"
                 />
 
@@ -1427,14 +1445,32 @@ function AnalysisResult({
               </>
             ) : (
               <>
+                <div className="flex items-center gap-2 mb-2">
+                  <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+                  <p className="text-[10px] uppercase tracking-[0.16em] text-emerald-400/80 font-semibold">
+                    AI Financial Coach
+                  </p>
+                </div>
+
                 {analysis.aiSummary && (
-                  <p className="text-sm font-semibold text-white leading-6 mb-2">
+                  <p className="text-sm font-semibold text-white leading-6 mb-3">
                     {analysis.aiSummary}
                   </p>
                 )}
-                <p className="text-sm text-gray-300 leading-6 whitespace-pre-line">
-                  {analysis.aiAdvice || analysis.message}
-                </p>
+
+                <div className="space-y-3">
+                  {(analysis.aiAdvice || analysis.message)
+                    .split(/\n\s*\n/)
+                    .filter(Boolean)
+                    .map((paragraph, index) => (
+                      <p
+                        key={index}
+                        className="text-sm text-gray-300 leading-6"
+                      >
+                        {paragraph}
+                      </p>
+                    ))}
+                </div>
               </>
             )}
 
