@@ -401,6 +401,22 @@ const response = await fetch(
           ).getDate()
         : 30;
 
+    // Keep the daily allowance consistent with the Dashboard:
+    // divide the money currently available after fixed + variable
+    // spending by the days remaining in the selected month.
+    const today = new Date();
+    const isCurrentMonth =
+      selectedPeriod.type === 'month' &&
+      selectedPeriod.year === today.getFullYear() &&
+      selectedPeriod.month === today.getMonth();
+
+    const daysRemaining = isCurrentMonth
+      ? Math.max(
+          1,
+          daysInPeriod - today.getDate()
+        )
+      : daysInPeriod;
+
     const dailyAvailable =
       periodIncome > 0
         ? Math.max(
@@ -408,7 +424,7 @@ const response = await fetch(
             (periodIncome -
               currentFixedSpent -
               currentVariableSpent) /
-              Math.max(1, daysInPeriod)
+              daysRemaining
           )
         : 0;
 
