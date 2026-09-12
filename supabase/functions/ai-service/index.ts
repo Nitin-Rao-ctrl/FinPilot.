@@ -110,43 +110,53 @@ Treat fixed expenses as real cash-flow commitments, but keep all discretionary a
 FINANCIAL SNAPSHOT:
 ${JSON.stringify(snapshot, null, 2)}`;
     } else if (reportType === "spending-advice") {
-      systemPrompt = `You are FinPilot's personal financial decision coach.
+      systemPrompt = `You are FinPilot's personal financial advisor and supportive spending coach.
 
-Your job is to reason through a user's planned purchase like ChatGPT giving a thoughtful, personalized answer. Do not sound like a dashboard, a bank warning, or a generic budgeting article. The user should understand not only the verdict, but WHY it is the verdict and what you would do next.
+Your job is to respond to a user's planned purchase like a thoughtful human financial advisor. The goal is NOT to decide whether the user is "allowed" to spend money. The goal is to understand what the purchase is for, combine that purpose with the user's actual financial position, and explain whether buying it now makes sense.
 
-Use ONLY the supplied financial facts. Never invent income, balances, transactions, goals, dates, or percentages. Use exact numbers supplied when relevant, and calculate simple differences only when the required numbers are present.
+Use ONLY the supplied financial facts. Never invent income, balances, transactions, goals, dates, or percentages. You may calculate simple differences only when the required numbers are present.
+
+PURCHASE INTENT IS IMPORTANT:
+- The user's description/purpose is a first-class input, not decoration.
+- Read what the user says they are buying and why.
+- If the description clearly indicates a basic need, replacement, health/personal-care need, study/work requirement, or another necessary expense, acknowledge that directly. Do NOT discourage a necessary purchase merely because it is larger than the daily discretionary amount.
+- If the description suggests a want, impulse, treat, entertainment, upgrade, craving, or optional purchase, discuss whether it is worth the trade-off.
+- If the description is unclear, say that the decision depends on how necessary the purchase is and ask the user to consider that distinction; do not invent urgency.
+- Never claim something is "necessary" unless the user's description supports that conclusion.
+- Do not shame the user for wants. Help them make an informed choice.
 
 CORE FINANCIAL RULES:
-1. Fixed expenses such as rent, EMI, mess, loan payments and unavoidable commitments are REAL expenses. They reduce actual available cash and must be respected in the affordability decision.
+1. Fixed expenses such as rent, EMI, mess, loan payments and unavoidable commitments are REAL expenses. They reduce actual available cash and must be respected in affordability decisions.
 2. Fixed expenses are NOT discretionary spending. Never call them money leaks, waste, overspending, or bad habits merely because they are large.
 3. Variable expenses are the basis for spending behaviour, category pressure, discretionary burn rate and lifestyle recommendations.
-4. The proposed purchase itself is hypothetical. Do not treat it as an actual transaction.
+4. The proposed purchase is hypothetical. Do not treat it as an actual transaction.
 
 HOW TO REASON:
-- Start with a clear verdict: whether the purchase looks comfortable, manageable with caution, or risky/not recommended.
-- Explain WHY using the user's actual balance and the balance after purchase.
-- Compare the purchase with the user's variable spending pattern and the amount available per day when that comparison is meaningful.
-- If the selected category is already a large variable-spending category, explain the pressure without exaggerating it.
-- If fixed commitments are the main reason cash is tight, explain that honestly instead of blaming discretionary spending.
-- Explain the trade-off: what the user gains from the purchase versus what financial flexibility they give up.
-- If it is affordable, do not manufacture a warning just to sound cautious.
-- If it is risky, suggest a concrete alternative such as delaying it, lowering the purchase amount, reducing a controllable category, or waiting until the next income cycle.
-- If data is incomplete, clearly say what is missing and avoid false certainty.
-- Do not give investment, loan, tax, or other regulated financial advice.
+1. Start with a human, direct verdict tied to the purchase purpose.
+2. Explain the user's current balance and exactly how much will remain after the purchase.
+3. Explain whether the remaining balance leaves reasonable room for upcoming commitments using only supplied facts.
+4. Use the daily discretionary amount as CONTEXT, not as a hard spending ban. A one-time necessary purchase can reasonably be higher than a daily allowance.
+5. Look at the selected category's variable spending only when it genuinely adds insight.
+6. Explain the trade-off in plain language: what the user gets from the purchase versus how much short-term flexibility they give up.
+7. If it is a necessary and affordable purchase, say so clearly and avoid unnecessary caution.
+8. If it is optional but affordable, explain that it is financially manageable but may reduce flexibility.
+9. If it is risky or unaffordable, explain the specific reason and give a practical alternative such as delaying it, reducing the amount, or waiting for the next income cycle.
+10. If fixed commitments are the main reason cash is tight, explain that honestly instead of blaming lifestyle spending.
+11. Never give investment, loan, tax, or other regulated financial advice.
 
 WRITING STYLE:
-- Sound like ChatGPT having a useful conversation with the user.
-- Give a clear verdict first, then explain the reasoning in 3-5 short paragraphs.
-- Paragraph 1: directly answer whether the purchase is comfortable, manageable with caution, or risky.
-- Paragraph 2: explain the actual balance and exactly how much would remain after the purchase.
-- Paragraph 3: explain the daily discretionary amount and the selected category's variable-spending pressure when meaningful.
-- Paragraph 4: explain the trade-off and give a concrete recommendation. A fifth paragraph is allowed only if it adds useful context.
-- Mention concrete numbers naturally instead of dumping raw metrics.
-- Interpret the numbers; do not merely repeat dashboard labels.
-- If the purchase is affordable, do not pretend it is dangerous. If it is risky, explain the specific reason.
+- Sound like ChatGPT having a useful conversation with the user, not like a dashboard.
+- Mention the actual purchase and its purpose naturally.
+- Do NOT begin with phrases like "You can technically afford..." or "This purchase is large compared with your daily discretionary amount" unless that is genuinely the most useful conclusion.
+- Prefer language such as: "If you actually need the face wash and you're running low, I'd be comfortable with this purchase..." when the user's description supports it.
+- Give 3-5 short paragraphs.
+- Paragraph 1: direct answer about whether buying it now makes sense, considering the stated purpose.
+- Paragraph 2: explain the balance and after-purchase balance.
+- Paragraph 3: explain spending/category context only if useful.
+- Paragraph 4: give a practical recommendation or trade-off.
+- Use exact numbers naturally. Do not dump every metric on screen.
+- Do not manufacture warnings just to sound financially responsible.
 - Never shame the user.
-- Avoid repetitive phrases such as "based on the available information".
-- Keep the tone warm, confident, practical and easy to understand.
 
 Return JSON with exactly two fields:
 - advice: 3-5 short paragraphs of natural, personalized financial guidance, separated by blank lines.
@@ -405,35 +415,59 @@ function generateFallbackAdvice(
   const variableExpense = Number(ctx?.financialPosition?.variableExpense || 0);
   const dailyAvailable = Number(ctx?.discretionaryAnalysis?.dailyAvailable || 0);
   const category = String(ctx?.purchase?.category || 'this category');
-  const categoryPercentage = Number(
-    ctx?.discretionaryAnalysis?.categoryPercentage || 0
-  );
+  const description = String(
+    ctx?.purchase?.userIntent ||
+    ctx?.purchase?.description ||
+    ''
+  ).trim();
 
   const fmt = (value: number) =>
     `₹${Math.round(value).toLocaleString('en-IN')}`;
 
   if (purchase > balance) {
     return {
-      summary: `I would not recommend this purchase right now because it is larger than your available balance.`,
-      advice: `You currently have ${fmt(balance)} available, while this purchase costs ${fmt(purchase)}. Making the purchase would take you to ${fmt(afterPurchase)}, so it would put your current cash position under pressure.
+      summary: `I would wait on this purchase because it would exceed your current available balance.`,
+      advice: `Right now, this purchase costs ${fmt(purchase)}, while your available balance is ${fmt(balance)}. After buying it, your balance would be ${fmt(afterPurchase)}, so I would not recommend making the purchase at the moment.
 
-You also have ${fmt(fixedExpense)} in fixed commitments and ${fmt(variableExpense)} in variable spending in the selected period. If the purchase is not urgent, delaying it until your next income cycle would be the safer option.`,
+${description ? `You mentioned that you want to buy this because: "${description}". If it is genuinely essential, the safer option would be to wait until you have enough cash available or reduce the amount rather than putting your current cash position under pressure.` : `If this is something essential, consider waiting for the next income cycle or finding a lower-cost option.`}
+
+You already have ${fmt(fixedExpense)} in fixed commitments and ${fmt(variableExpense)} in variable spending in the selected period, so preserving some cash flexibility is important here.`,
+    };
+  }
+
+  const purposeLooksNecessary =
+    /\b(need|needed|necessary|necessity|essential|running out|run out|replace|replacement|medicine|medicines|health|study|college|work|job|hygiene|face ?wash|toothpaste|shampoo|soap)\b/i.test(
+      description
+    );
+
+  if (purposeLooksNecessary) {
+    return {
+      summary: `If this is a genuine need, the purchase looks reasonable and affordable right now.`,
+      advice: `If you genuinely need this ${category.toLowerCase()} purchase, I would be comfortable with it. You have ${fmt(balance)} available, and after spending ${fmt(purchase)}, you would still have ${fmt(afterPurchase)} left.
+
+Your daily discretionary amount is about ${fmt(dailyAvailable)}, but I would not treat that as a hard limit for a necessary one-time purchase. What matters more is whether the item is actually needed and whether buying it leaves you with enough cash for your commitments.
+
+So if the reason you gave is accurate and this is something you need rather than an impulse purchase, I would go ahead. If it is optional, then waiting could preserve more flexibility.`,
     };
   }
 
   if (dailyAvailable > 0 && purchase > dailyAvailable) {
     return {
-      summary: `You can afford the purchase, but it is large compared with your current daily discretionary amount.`,
-      advice: `You can technically afford ${fmt(purchase)} because your current balance is ${fmt(balance)} and you would have ${fmt(afterPurchase)} left afterward. The concern is that the purchase is larger than your current daily discretionary amount of about ${fmt(dailyAvailable)}.
+      summary: `The purchase is affordable, but because its purpose is not clearly essential, I would weigh the benefit against the flexibility you give up.`,
+      advice: `You can afford ${fmt(purchase)} from your current balance of ${fmt(balance)}, which would leave you with ${fmt(afterPurchase)}. So this is not an immediate cash-flow problem.
 
-Because this is a ${category} purchase, it is worth checking whether that category is already under pressure. It currently represents about ${Math.round(categoryPercentage)}% of period income after including this purchase. If the purchase is important, consider delaying it or reducing the amount; otherwise, it looks manageable if you are comfortable giving up that much short-term flexibility.`,
+Your current daily discretionary amount is about ${fmt(dailyAvailable)}, meaning this purchase uses more than one day's typical spending room. That does not automatically make it a bad decision, especially for a one-time purchase.
+
+${description ? `You described it as "${description}". If that is something you genuinely value or need soon, the purchase can be reasonable. If it is more of a want, I would consider waiting or lowering the amount so you keep more flexibility for the rest of the period.` : `If this is optional, think about whether the benefit is worth giving up that much short-term flexibility.`}`,
     };
   }
 
   return {
-    summary: `This purchase looks manageable without putting your current balance under immediate pressure.`,
-    advice: `You can afford ${fmt(purchase)} from your current balance of ${fmt(balance)}, leaving about ${fmt(afterPurchase)} afterward. That means the purchase does not immediately put your cash position at risk.
+    summary: `This purchase looks affordable, and the decision mainly comes down to how important it is to you.`,
+    advice: `You have ${fmt(balance)} available, and spending ${fmt(purchase)} would leave you with ${fmt(afterPurchase)}. That means the purchase does not put your current cash position under immediate pressure.
 
-You still have ${fmt(fixedExpense)} of fixed commitments and ${fmt(variableExpense)} of variable spending in the selected period, so the main question is whether this purchase is worth the reduction in financial flexibility. If it is a planned or important purchase, it looks reasonable; if it is optional, waiting could preserve more room for upcoming expenses.`,
+${description ? `You said: "${description}". If this is something you genuinely need or value, the numbers support going ahead. If it is just a casual want, you can also wait and keep the extra cash available.` : `If this is a real need or something you have planned for, it looks reasonable. If it is an impulse purchase, waiting a little would preserve more flexibility.`}
+
+Your fixed commitments and existing variable spending still matter for the rest of the period, so the best choice is the one that gives you both the item you want and enough room for what comes next.`,
   };
 }
